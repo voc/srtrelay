@@ -7,11 +7,6 @@ import (
 	"github.com/voc/srtrelay/relay"
 )
 
-// Socket Options
-// const (
-// // streamIDSocketOption =
-// )
-
 func main() {
 	options := make(map[string]string)
 	options["blocking"] = "0"
@@ -28,7 +23,6 @@ func main() {
 		log.Fatalln("listen failed", err)
 	}
 	log.Printf("Listening on %s:%d\n", address, port)
-	// log.Println("packetSize", sck.PacketSize())
 
 	server := relay.NewServer()
 
@@ -42,8 +36,6 @@ func main() {
 
 	for {
 		sock, err := sck.Accept()
-		log.Println("packetsize", sock.PacketSize())
-		// stats, _ := sock.Stats()
 		if err != nil {
 			log.Fatalln("accept failed", err)
 		}

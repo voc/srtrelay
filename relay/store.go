@@ -30,6 +30,11 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 	ch.subs = append(ch.subs, sub)
 
 	var unsub UnsubscribeFunc = func() {
+		// Channel already closed, just skip unsub
+		if ch.subs == nil {
+			return
+		}
+
 		ch.mutex.Lock()
 		defer ch.mutex.Unlock()
 		var idx int
@@ -39,7 +44,10 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 				break
 			}
 		}
-		ch.subs = append(ch.subs[:idx], ch.subs[idx+1:]...)
+
+		ch.subs[idx] = ch.subs[len(ch.subs)-1] // Copy last element to index i.
+		ch.subs[len(ch.subs)-1] = nil          // Erase last element (write zero value).
+		ch.subs = ch.subs[:len(ch.subs)-1]     // Truncate slice.
 		log.Println("unsub", idx)
 	}
 	return sub, unsub
