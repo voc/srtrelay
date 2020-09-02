@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/haivision/srtgo"
 )
@@ -21,7 +22,11 @@ var (
 
 const (
 	StreamIDSockOpt = 46
+
+	PacketSize = 1456
 )
+
+const statsPeriodMs = 2
 
 type Server interface {
 	Handle(*srtgo.SrtSocket)
@@ -91,15 +96,25 @@ func (s *ServerImpl) Handle(sock *srtgo.SrtSocket) {
 }
 
 func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
-	sub, err := s.ps.Subscribe(name)
+	sub, unsubscribe, err := s.ps.Subscribe(name)
 	if err != nil {
 		return err
 	}
+	defer unsubscribe()
 
 	log.Println("Subscribe", name)
-
+	statsTimeout := time.Now().Add(time.Second * statsPeriodMs)
 	for {
 		buf, ok := <-sub
+
+		now := time.Now()
+		if now.After(statsTimeout) {
+			statsTimeout = now.Add(time.Second * statsPeriodMs)
+			stats, err := sock.Stats()
+			if err == nil {
+				log.Printf("output drop: %d, rate: %f mbit/s, unacked: %d\n", stats.PktSndDropTotal, stats.MbpsSendRate, stats.PktSndBuf)
+			}
+		}
 
 		// Upstream closed, drop connection
 		if !ok {
@@ -118,19 +133,28 @@ func (s *ServerImpl) publish(name string, sock *srtgo.SrtSocket) error {
 	}
 	defer close(pub)
 
-	buf := make([]byte, 1316)
 	log.Println("Publish", name)
+	statsTimeout := time.Now().Add(time.Second * statsPeriodMs)
 	for {
-		n, err := sock.Read(buf, len(buf))
+		buf := make([]byte, PacketSize)
+		n, err := sock.Read(buf, PacketSize)
 		if err != nil {
 			log.Println(err)
 			return nil
 		}
+		// EOF
 		if n == 0 {
 			return nil
 		}
-		// fmt.Printf("Received %d bytes\n", n)
-		// pub.Write(buf[:n])
-		pub <- buf
+
+		now := time.Now()
+		if now.After(statsTimeout) {
+			statsTimeout = now.Add(time.Second * statsPeriodMs)
+			stats, err := sock.Stats()
+			if err == nil {
+				log.Printf("input drop: %d, rate: %f mbit/s, unreceived: %d\n", stats.PktRcvDrop, stats.MbpsRecvRate, stats.PktRcvBuf)
+			}
+		}
+		pub <- buf[:n]
 	}
 }

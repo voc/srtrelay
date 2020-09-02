@@ -4,22 +4,16 @@ import (
 	"io"
 	"log"
 	"sync"
-
-	"context"
-
-	"github.com/asticode/go-astits"
-	// "github.com/drillbits/go-ts"
-	// "github.com/asticode/go-astits/astits"
 )
 
+type UnsubscribeFunc func()
 type PubSub interface {
 	Publish(string) (chan<- []byte, error)
-	Subscribe(string) (<-chan []byte, error)
+	Subscribe(string) (<-chan []byte, UnsubscribeFunc, error)
 }
 
 type Channel struct {
 	mutex sync.Mutex
-	dmx *astits.Demuxer
 	subs []chan []byte
 }
 
@@ -28,37 +22,32 @@ type PubSubImpl struct {
 	channels map[string]*Channel
 }
 
-func (ch *Channel) Sub() <-chan []byte {
+
+func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	sub := make(chan []byte, 10)
+	sub := make(chan []byte, 80) // about 300ms at 3Mbit/s
 	ch.subs = append(ch.subs, sub)
-	return sub
+
+	var unsub UnsubscribeFunc = func() {
+		ch.mutex.Lock()
+		defer ch.mutex.Unlock()
+		var idx int
+		for i := range ch.subs {
+			if ch.subs[i] == sub {
+				idx = i
+				break
+			}
+		}
+		ch.subs = append(ch.subs[:idx], ch.subs[idx+1:]...)
+		log.Println("unsub", idx)
+	}
+	return sub, unsub
 }
-
-// f, _ := os.Open("/path/to/file.ts")
-// defer f.Close()
-
-// // Create the demuxer
-// for {
-//     // Get the next data
-//     d, _ := dmx.NextData()
-
-//     // Data is a PMT data
-//     if d.PMT != nil {
-//         // Loop through elementary streams
-//         for _, es := range d.PMT.ElementaryStreams {
-//                 fmt.Printf("Stream detected: %d\n", es.ElementaryPID)
-//         }
-//         return
-//     }
-// }
 
 func (ch *Channel) Pub(b []byte) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	// Parse and store last PPS
-	// log.Println("fwd", len(b))
 	for i := range ch.subs {
 		select {
 			case ch.subs[i] <- b:
@@ -66,7 +55,8 @@ func (ch *Channel) Pub(b []byte) {
 
 			// TODO: mark overflowed chan for drop
 			default:
-				log.Println("drop", i)
+				close(ch.subs[i])
+				log.Println("dropping client", i)
 		}
 	}
 }
@@ -112,54 +102,38 @@ func (s *PubSubImpl) Publish(name string) (chan<- []byte, error) {
 	s.channels[name] = channel
 	s.mutex.Unlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
 	ch := make(chan []byte, 0)
-
-	dmx := astits.New(ctx, &Forwarder{ch})
 
 	// Setup publisher goroutine
 	go func() {
 		for {
-			d, err := dmx.NextData()
-			// buf, ok := <-ch
+			buf, ok := <-ch
 
 			// Channel closed, Teardown pubsub
-			if err != nil {
-				log.Println(err)
+			if !ok {
 				// Need a lock on the map first to stop new subscribers
 				s.mutex.Lock()
 				log.Println("Removing stream", name)
 				delete(s.channels, name)
 				channel.Close()
-				cancel()
 				s.mutex.Unlock()
 				return
 			}
 
-			log.Println(d)
-
-			// Data is a PMT data
-			if d.PMT != nil {
-				// Loop through elementary streams
-				for _, es := range d.PMT.ElementaryStreams {
-					log.Printf("Stream detected: %d\n", es.ElementaryPID)
-				}
-				return
-			}
-
 			// Publish buf to subscribers
-			// channel.Pub(buf)
+			channel.Pub(buf)
 		}
 	}()
 	return ch, nil
 }
 
-func (s *PubSubImpl) Subscribe(name string) (<-chan []byte, error) {
+func (s *PubSubImpl) Subscribe(name string) (<-chan []byte, UnsubscribeFunc, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	channel, ok := s.channels[name]
 	if !ok {
-		return nil, StreamNotExisting
+		return nil, nil, StreamNotExisting
 	}
-	return channel.Sub(), nil
+	ch, unsub := channel.Sub()
+	return ch, unsub, nil
 }
