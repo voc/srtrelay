@@ -11,7 +11,7 @@ func main() {
 	options := make(map[string]string)
 	options["blocking"] = "0"
 	options["transtype"] = "live"
-	options["latency"] = "20"
+	options["latency"] = "200"
 
 	address := "0.0.0.0"
 	port := uint16(8090)

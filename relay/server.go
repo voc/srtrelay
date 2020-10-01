@@ -8,7 +8,6 @@ import (
 	"errors"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/haivision/srtgo"
 )
@@ -103,22 +102,31 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 	defer unsubscribe()
 
 	log.Println("Subscribe", name)
-	statsTimeout := time.Now().Add(time.Second * statsPeriodMs)
+
+	dmx := Demuxer{}
+	playing := false
 	for {
 		buf, ok := <-sub
-
-		now := time.Now()
-		if now.After(statsTimeout) {
-			statsTimeout = now.Add(time.Second * statsPeriodMs)
-			stats, err := sock.Stats()
-			if err == nil {
-				log.Printf("output drop: %d, rate: %f mbit/s, unacked: %d\n", stats.PktSndDropTotal, stats.MbpsSendRate, stats.PktSndBuf)
-			}
-		}
 
 		// Upstream closed, drop connection
 		if !ok {
 			return nil
+		}
+
+		// Find synchronization point
+		if !playing {
+			init, err := dmx.FindInit(buf)
+			if err != nil {
+				return err
+			} else if init != nil {
+				for i := range init {
+					buf := init[i]
+					sock.Write(buf, len(buf))
+				}
+				playing = true
+			} else {
+				continue
+			}
 		}
 
 		// Write to socket
@@ -134,7 +142,6 @@ func (s *ServerImpl) publish(name string, sock *srtgo.SrtSocket) error {
 	defer close(pub)
 
 	log.Println("Publish", name)
-	statsTimeout := time.Now().Add(time.Second * statsPeriodMs)
 	for {
 		buf := make([]byte, PacketSize)
 		n, err := sock.Read(buf, PacketSize)
@@ -147,14 +154,6 @@ func (s *ServerImpl) publish(name string, sock *srtgo.SrtSocket) error {
 			return nil
 		}
 
-		now := time.Now()
-		if now.After(statsTimeout) {
-			statsTimeout = now.Add(time.Second * statsPeriodMs)
-			stats, err := sock.Stats()
-			if err == nil {
-				log.Printf("input drop: %d, rate: %f mbit/s, unreceived: %d\n", stats.PktRcvDrop, stats.MbpsRecvRate, stats.PktRcvBuf)
-			}
-		}
 		pub <- buf[:n]
 	}
 }

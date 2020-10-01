@@ -14,12 +14,32 @@ type PubSub interface {
 
 type Channel struct {
 	mutex sync.Mutex
-	subs []chan []byte
+	subs Subs
 }
 
 type PubSubImpl struct {
 	mutex sync.Mutex
 	channels map[string]*Channel
+}
+
+type Subs []chan []byte
+func (subs Subs) Remove(sub chan []byte) Subs {
+	idx := -1
+	for i := range subs {
+		if subs[i] == sub {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil
+	}
+
+	log.Println("remove", idx)
+
+	subs[idx] = subs[len(subs)-1] // Copy last element to index i.
+	subs[len(subs)-1] = nil       // Erase last element (write zero value).
+	return subs[:len(subs)-1]     // Truncate slice.
 }
 
 
@@ -37,18 +57,8 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 
 		ch.mutex.Lock()
 		defer ch.mutex.Unlock()
-		var idx int
-		for i := range ch.subs {
-			if ch.subs[i] == sub {
-				idx = i
-				break
-			}
-		}
 
-		ch.subs[idx] = ch.subs[len(ch.subs)-1] // Copy last element to index i.
-		ch.subs[len(ch.subs)-1] = nil          // Erase last element (write zero value).
-		ch.subs = ch.subs[:len(ch.subs)-1]     // Truncate slice.
-		log.Println("unsub", idx)
+		ch.subs = ch.subs.Remove(sub)
 	}
 	return sub, unsub
 }
@@ -56,6 +66,8 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 func (ch *Channel) Pub(b []byte) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
+
+	toRemove := make(Subs, 0, 5)
 	for i := range ch.subs {
 		select {
 			case ch.subs[i] <- b:
@@ -63,9 +75,13 @@ func (ch *Channel) Pub(b []byte) {
 
 			// TODO: mark overflowed chan for drop
 			default:
-				close(ch.subs[i])
+				toRemove = append(toRemove, ch.subs[i])
 				log.Println("dropping client", i)
+			}
 		}
+	for _,sub := range toRemove {
+		ch.subs = ch.subs.Remove(sub)
+		close(sub)
 	}
 }
 
