@@ -1,17 +1,2 @@
-github.com/asticode/go-astikit v0.2.0 h1:QonRVJKQB2btMYZGW+YkibMDOXje2F49RLW4UCnyjns=
-github.com/asticode/go-astikit v0.2.0/go.mod h1:h4ly7idim1tNhaVkdVBeXQZEE3L0xblP7fCWbgwipF0=
-github.com/asticode/go-astits v1.4.0 h1:cKhsxL3FaAIgMU3p/EM/KcTDczliX2yKhGlHuTfLhrs=
-github.com/asticode/go-astits v1.4.0/go.mod h1:Dp78dEuksl+pWzlXTkpdd91U1QDX9r57db1XpLHm5Mw=
-github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/haivision/srtgo v0.0.0-20200605105322-880b4c6bea33 h1:BPm+g8eNY4I8CrvBunJFj0As2ChGw13/HYhVQTmLydY=
-github.com/haivision/srtgo v0.0.0-20200605105322-880b4c6bea33/go.mod h1:yVZ4oACfcnUAcxrh+0b6IuIWfkHLK3IAQ99tuuhRx54=
 github.com/haivision/srtgo v0.0.0-20200731151239-e00427ae473a h1:JliMkv/mAqM5+QzG6Hkw1XcVl1crU8yIQGnhppMv7s0=
 github.com/haivision/srtgo v0.0.0-20200731151239-e00427ae473a/go.mod h1:yVZ4oACfcnUAcxrh+0b6IuIWfkHLK3IAQ99tuuhRx54=
-github.com/openfresh/gosrt v0.2.0 h1:L8Nq5k9G/88YxdBDorcFi+jxxfJdUmMv0151bCmYBKw=
-github.com/openfresh/gosrt v0.2.0/go.mod h1:lSCk9gKdRrO0xHbS3LlVgoofxId8QF56jmxGwBX3XlM=
-github.com/pkg/profile v1.4.0/go.mod h1:NWz/XGvpEW1FyYQ7fCx4dqYBLlfTcE+A9FLAkNKqjFE=
-github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
-github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
-gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
-gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=

@@ -82,6 +82,7 @@ func (p *Parser) ParsePSI(payload []byte) error {
 	offset++
 	sectionLen := binary.BigEndian.Uint16(payload[offset : offset+2])
 	log.Println("tid", tid, "sectionLength", sectionLen)
+	return nil
 }
 
 // isPSIPayload checks whether the payload is a PSI one

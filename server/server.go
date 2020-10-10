@@ -1,4 +1,4 @@
-package relay
+package server
 
 // #cgo LDFLAGS: -lsrt
 // #include <srt/srt.h>
@@ -10,6 +10,15 @@ import (
 	"strings"
 
 	"github.com/haivision/srtgo"
+	"github.com/voc/srtrelay/format"
+	"github.com/voc/srtrelay/relay"
+)
+
+const (
+	StreamIDSockOpt = 46
+
+	// PacketSize = 1456
+	PacketSize = 1316 // TS_UDP_LEN
 )
 
 var (
@@ -19,35 +28,34 @@ var (
 	StreamNotExisting   = errors.New("Stream does not exist")
 )
 
-const (
-	StreamIDSockOpt = 46
-
-	PacketSize = 1456
-)
-
 const statsPeriodMs = 2
 
+// Server is an interface for a srt relay server
 type Server interface {
 	Handle(*srtgo.SrtSocket)
 }
 
+// ServerImpl implements the Server interface
 type ServerImpl struct {
-	ps PubSub
+	ps relay.Relay
 }
 
+// NewServer creates a server
 func NewServer() Server {
-	ps := NewPubSub()
+	ps := relay.NewRelay()
 	return &ServerImpl{ps}
 }
 
+// Mode - client mode
 type Mode uint8
 
 const (
 	_ Mode = iota
-	Play
-	Publish
+	ModePlay
+	ModePublish
 )
 
+// ParseStreamID separates mode and stream name
 func ParseStreamID(streamID string) (string, Mode, error) {
 	split := strings.Split(streamID, "/")
 	if len(split) != 2 {
@@ -59,15 +67,16 @@ func ParseStreamID(streamID string) (string, Mode, error) {
 	var mode Mode
 	switch modeStr {
 	case "play":
-		mode = Play
+		mode = ModePlay
 	case "publish":
-		mode = Publish
+		mode = ModePublish
 	default:
 		return "", 0, InvalidMode
 	}
 	return name, mode, nil
 }
 
+// Handle srt client connection
 func (s *ServerImpl) Handle(sock *srtgo.SrtSocket) {
 	defer sock.Close()
 
@@ -84,9 +93,9 @@ func (s *ServerImpl) Handle(sock *srtgo.SrtSocket) {
 	}
 
 	switch mode {
-	case Play:
+	case ModePlay:
 		err = s.play(name, sock)
-	case Publish:
+	case ModePublish:
 		err = s.publish(name, sock)
 	}
 	if err != nil {
@@ -94,6 +103,7 @@ func (s *ServerImpl) Handle(sock *srtgo.SrtSocket) {
 	}
 }
 
+// play a stream from the server
 func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 	sub, unsubscribe, err := s.ps.Subscribe(name)
 	if err != nil {
@@ -103,7 +113,7 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 
 	log.Println("Subscribe", name)
 
-	dmx := Demuxer{}
+	dmx := format.Demuxer{}
 	playing := false
 	for {
 		buf, ok := <-sub
@@ -134,6 +144,7 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 	}
 }
 
+// publish a stream to the server
 func (s *ServerImpl) publish(name string, sock *srtgo.SrtSocket) error {
 	pub, err := s.ps.Publish(name)
 	if err != nil {

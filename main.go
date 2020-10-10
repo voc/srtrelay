@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/haivision/srtgo"
-	"github.com/voc/srtrelay/relay"
+	"github.com/voc/srtrelay/server"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 	}
 	log.Printf("Listening on %s:%d\n", address, port)
 
-	server := relay.NewServer()
+	server := server.NewServer()
 
 	// Handle SIGTERM signal
 	// ch := make(chan os.Signal, 1)
