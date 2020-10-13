@@ -16,13 +16,19 @@ const (
 // Demuxer used for finding synchronization point for onboarding a client
 type Demuxer struct {
 	transport TransportType
-	parser    mpegts.Parser
+	parser    *mpegts.Parser
+}
+
+func NewDemuxer() *Demuxer {
+	return &Demuxer{
+		parser: mpegts.NewParser(),
+	}
 }
 
 // DetermineTransport tries to detect the type of transport from the stream
 // If the type is not clear it returns Unknown
 func DetermineTransport(data []byte) TransportType {
-	if len(data) >= mpegts.HeaderLen && data[0] == mpegts.Magic {
+	if len(data) >= mpegts.HeaderLen && data[0] == mpegts.SyncByte {
 		return MpegTs
 	}
 

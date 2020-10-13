@@ -2,43 +2,60 @@ package mpegts
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"log"
 )
 
-const (
-	Magic = 0x47
-
-	HeaderLen = 4
-	PacketLen = 188
-	PIDOffset = 8
-
-	PUSIHdrMask       = 0x400000
-	PIDHdrMask        = 0x1fff00
-	AdaptationHdrMask = 0x20
-	PayloadHdrMask    = 0x10
+// MPEGTS errors
+var (
+	ErrDataTooLong   = errors.New("Data too long")
+	ErrInvalidPacket = errors.New("Invalid MPEGTS packet")
 )
 
-// PIDs
+// PID constants
 const (
 	PIDPAT  = 0x0    // Program Association Table (PAT) contains a directory listing of all Program Map Tables.
-	PIDCAT  = 0x1    // Conditional Access Table (CAT) contains a directory listing of all ITU-T Rec. H.222 entitlement management message streams used by Program Map Tables.
 	PIDTSDT = 0x2    // Transport Stream Description Table (TSDT) contains descriptors related to the overall transport stream
 	PIDNull = 0x1fff // Null Packet (used for fixed bandwidth padding)
 )
 
+// Parser object for finding the synchronization point in a MPEGTS stream
+// This works as follows: parse packets until all the following have been fulfilled
+//   1. Parse PAT to get PID->PMT mappings
+//   2. Parse PMTs to Find PID->PES mappings
+//   3. Parse PES to find H.264 SPS+PPS or equivalent
+// Store the original packets or generate new ones to send to a client
 type Parser struct {
-	hasInit bool
-	init    [][]byte
-	pm      map[uint16]uint16 // map[ProgramMapID]ProgramNumber
+	init               [][]byte
+	expectedPATSection byte
+	expectedPMTSection byte
+	hasPAT             bool
+	hasPMT             bool
+	hasInit            bool
+	hasSPS             bool
+	hasPPS             bool
+	pmtMap             map[uint16]uint16 // map[pid]programNumber
+	esMap              map[uint16]byte   // map[pid]streamType
 }
 
-// 1. Parse PAT to get PID->PMT mappings
-// 2. Parse PMTs to Find PID->PES mappings
-// 3. Parse PES to find H.264 SPS or equivalent
-// Store the whole shebang in order and send it to the client
-// Maybe remember PAT+PMTs for a whole stream?
+func NewParser() *Parser {
+	return &Parser{
+		pmtMap: make(map[uint16]uint16),
+		esMap:  make(map[uint16]byte),
+	}
+}
 
+// InitData returns data needed for decoder init or nil if the parser is not ready yet
+func (p *Parser) InitData() [][]byte {
+	if !p.hasPAT || !p.hasPMT || !p.hasSPS || !p.hasPPS {
+		return nil
+	}
+
+	return p.init
+}
+
+// Parse processes all MPEGTS packets from a buffer
 func (p *Parser) Parse(data []byte) error {
 	for {
 		if len(data) == 0 {
@@ -47,7 +64,7 @@ func (p *Parser) Parse(data []byte) error {
 		pkt := Packet{}
 		err := pkt.FromBytes(data)
 		if err != nil {
-			// Incomplete packet, TODO: keep rest data
+			// Incomplete packet, TODO: keep rest data?
 			if err == io.ErrUnexpectedEOF {
 				log.Fatalln("parsing failed, incomplete packet")
 				return nil
@@ -55,49 +72,211 @@ func (p *Parser) Parse(data []byte) error {
 			return err
 		}
 
-		// parse table
-		if pkt.PID == PIDPAT && pkt.PUSI {
-			p.ParsePSI(pkt.Payload)
+		storePacket := false
+		if pkt.PID == PIDPAT {
+			// parse PMT and store PAT packet
+			storePacket, err = p.ParsePSI(pkt.Payload)
+			if err != nil {
+				return err
+			}
 
+		} else if _, ok := p.pmtMap[pkt.PID]; ok {
+			// Parse PID->ES mapping and store PMT packet
+			storePacket, err = p.ParsePSI(pkt.Payload)
+			if err != nil {
+				return err
+			}
+
+		} else if _, ok := p.esMap[pkt.PID]; ok {
+			// Parse PES and store SPS+PPS packet
+			storePacket, err = p.ParsePES(pkt.Payload, pkt.PID)
+			if err != nil {
+				return err
+			}
 		}
+
+		if storePacket {
+			p.init = append(p.init, data[:pkt.Size()])
+		}
+
+		// parse PMT and store
 
 		data = data[pkt.Size():]
 	}
 }
 
+// ParsePSI selectively parses a Program Specific Information (PSI) table
+// We are only interested in PAT and PMT
+func (p *Parser) ParsePSI(data []byte) (bool, error) {
+	// skip to section header
+	ptr := int(data[0])
+	offset := 1 + ptr
+	shouldStore := false
+
+	hdr, err := ParsePSIHeader(data[offset:])
+	if err != nil {
+		return false, err
+	}
+	offset += PSIHeaderLen
+
+	// We are only interested in PAT and PMT
+	switch hdr.tableID {
+	case TableTypePAT:
+		// expect program map in order
+		if p.expectedPATSection != hdr.sectionNumber || !hdr.currentNext {
+			return false, nil
+		}
+
+		end := offset + int(hdr.sectionLength-9)/4
+		for {
+			programNumber := binary.BigEndian.Uint16(data[offset : offset+2])
+			offset += 2
+			pid := binary.BigEndian.Uint16(data[offset:offset+2]) & 0x1fff
+			offset += 2
+			if programNumber != 0 {
+				p.pmtMap[pid] = programNumber
+			}
+			if offset >= end {
+				break
+			}
+		}
+		shouldStore = true
+		p.expectedPATSection = hdr.sectionNumber + 1
+		if hdr.sectionNumber == hdr.lastSectionNumber {
+			log.Println("got PAT")
+			p.hasPAT = true
+		}
+
+	case TableTypePMT:
+		// expect program map in order
+		if p.expectedPMTSection != hdr.sectionNumber || !hdr.currentNext {
+			return false, nil
+		}
+
+		// skip PCR PID
+		offset += 2
+
+		programInfoLength := binary.BigEndian.Uint16(data[offset:offset+2]) & 0xfff
+		offset += 2 + int(programInfoLength)
+
+		end := offset + int(hdr.sectionLength-programInfoLength-13)
+		for {
+			streamType := data[offset]
+			offset++
+
+			elementaryPID := binary.BigEndian.Uint16(data[offset:offset+2]) & 0x1fff
+			offset += 2
+
+			esInfoLength := binary.BigEndian.Uint16(data[offset:offset+2]) & 0xfff
+			offset += 2 + int(esInfoLength)
+
+			// log.Println("stream type", streamType, "elementary pid", elementaryPID, "esInfoLength", esInfoLength)
+			p.esMap[elementaryPID] = streamType
+
+			if offset >= end {
+				break
+			}
+		}
+
+		shouldStore = true
+		p.expectedPMTSection = hdr.sectionNumber + 1
+		if hdr.sectionNumber == hdr.lastSectionNumber {
+			log.Println("got PMT")
+			p.hasPMT = true
+		}
+	}
+	return shouldStore, nil
+}
+
+// PES constants
 const (
-	TableTypePAT = 0x0
-	TableTypePMT = 0x2
+	PESStartCode   = 0x000001
+	MaxPayloadSize = PacketLen - 4
+	PESMaxLength   = 200 * 1024
+
+	PESStreamIDAudio = 0xc0
+	PESStreamIDVideo = 0xe0
 )
 
-func (p *Parser) ParsePSI(payload []byte) error {
-	ptr := int(payload[0])
-	log.Println("table ptr", ptr)
-	offset := 1 + ptr
+// AVC NAL constants
+const (
+	NALStartCode  = 0x00000001 // NAL Start code with single zero byte, required for SPS, PPS and first NAL per picture
+	NALHeaderSize = 6
+)
 
-	if len(payload)-offset < 3 {
-		return io.ErrUnexpectedEOF
+// AVC NAL unit type constants
+const (
+	NALUnitTypeSPS = 7
+	NALUnitTypePPS = 8
+)
+
+func (p *Parser) ParsePES(data []byte, pid uint16) (bool, error) {
+	var shouldStore bool
+
+	if !isPESPayload(data) {
+		return false, nil
 	}
-	tid := payload[offset]
+
+	// start := binary.BigEndian.Uint32(data[0:4])
+	// packetStartCode := start >> 8 & 0xffffff
+	if data[0] != 0x0 || data[1] != 0x0 || data[2] != 0x1 {
+		// log.Println("invalid PES start code")
+		return false, nil
+		// return false, ErrInvalidPacket
+	}
+	offset := 3
+
+	streamID := data[offset]
+	if streamID != PESStreamIDVideo {
+		return false, nil
+	}
 	offset++
-	sectionLen := binary.BigEndian.Uint16(payload[offset : offset+2])
-	log.Println("tid", tid, "sectionLength", sectionLen)
-	return nil
-}
 
-// isPSIPayload checks whether the payload is a PSI one
-func (p *Parser) PSIPID(pid uint16) bool {
-	_, knownPID := p.pm[pid]
-	return pid == PIDPAT || // PAT
-		knownPID || // PMT
-		((pid >= 0x10 && pid <= 0x14) || (pid >= 0x1e && pid <= 0x1f)) //DVB
-}
+	packetLength := int(binary.BigEndian.Uint16(data[offset : offset+2]))
+	// unbounded packet, only allowed for video ES
+	if packetLength == 0 {
+		packetLength = PESMaxLength
+	}
+	offset += 2
 
-// Return data needed for decoder init or nil
-func (p *Parser) InitData() [][]byte {
-	if !p.hasInit {
-		return nil
+	// Just look for NAL units...
+	for {
+		if offset > len(data)-NALHeaderSize {
+			break
+		}
+
+		// Find NAL
+		// start := binary.BigEndian.Uint32(data[offset+1:offset+5]) >> 8
+		if data[offset] == 0x0 && data[offset+1] == 0x0 && data[offset+2] == 0x0 && data[offset+3] == 0x1 {
+			// log.Printf("nal header: 0x%x", data[offset:offset+6])
+
+			offset += 4
+
+			forbiddenZero := data[offset] >> 7 & 1
+			if forbiddenZero != 0 {
+				offset++
+				// log.Println("forbidden zero wasn't zero")
+				continue
+			}
+
+			// refIdc := data[offset] >> 5 & 0x3
+
+			unitType := data[offset] & 0x1f
+			// log.Printf("nal, offset: %x, unit type: %x, ref idc: %x\n", offset, unitType, refIdc)
+			if unitType == NALUnitTypeSPS {
+				log.Println("got SPS")
+				shouldStore = true
+				p.hasSPS = true
+			} else if unitType == NALUnitTypePPS {
+				log.Println("got PPS")
+				shouldStore = true
+				p.hasPPS = true
+			}
+		}
+		offset++
 	}
 
-	return p.init
+	// Parse PTS
+	// log.Printf("got ES start, stream id: %x, length: %d, pid: %d\n", streamID, packetLength, pid)
+	return shouldStore, nil
 }

@@ -113,7 +113,7 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 
 	log.Println("Subscribe", name)
 
-	dmx := format.Demuxer{}
+	demux := format.NewDemuxer()
 	playing := false
 	for {
 		buf, ok := <-sub
@@ -125,10 +125,11 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 
 		// Find synchronization point
 		if !playing {
-			init, err := dmx.FindInit(buf)
+			init, err := demux.FindInit(buf)
 			if err != nil {
 				return err
 			} else if init != nil {
+				log.Println("got init", len(init))
 				for i := range init {
 					buf := init[i]
 					sock.Write(buf, len(buf))
