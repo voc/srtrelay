@@ -118,6 +118,11 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 	for {
 		buf, ok := <-sub
 
+		buffered := len(sub)
+		if buffered > 40 {
+			log.Println("late in buffer", len(sub))
+		}
+
 		// Upstream closed, drop connection
 		if !ok {
 			return nil

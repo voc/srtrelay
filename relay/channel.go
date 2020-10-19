@@ -93,16 +93,3 @@ func (ch *Channel) Close() {
 	}
 	ch.subs = nil
 }
-
-// type Forwarder struct {
-// 	ch chan []byte
-// }
-
-// func (f *Forwarder) Read(p []byte) (n int, err error) {
-// 	res, ok := <-f.ch
-// 	if !ok {
-// 		return 0, io.EOF
-// 	}
-// 	copy(p, res)
-// 	return len(res), nil
-// }

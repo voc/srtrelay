@@ -21,6 +21,12 @@ ffplay srt://localhost:8090?streamid=test/play
   - No remuxing -> use ffmpeg instead
   - Allow any data to be relayed, not just MPEG-TS
 
+## Develop
+Run tests
+```
+go test ./...
+```
+
 ## Credits
 Thanks go to
   - Edward Wu for [srt-live-server](https://github.com/Edward-Wu/srt-live-server)

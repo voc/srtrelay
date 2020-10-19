@@ -20,6 +20,12 @@ const (
 	PIDNull = 0x1fff // Null Packet (used for fixed bandwidth padding)
 )
 
+// StreamType constants
+const (
+	StreamTypeH264 = 0x1b
+	StreamTypeH265 = 0x24
+)
+
 // Parser object for finding the synchronization point in a MPEGTS stream
 // This works as follows: parse packets until all the following have been fulfilled
 //   1. Parse PAT to get PID->PMT mappings
@@ -27,41 +33,62 @@ const (
 //   3. Parse PES to find H.264 SPS+PPS or equivalent
 // Store the original packets or generate new ones to send to a client
 type Parser struct {
-	init               [][]byte
-	expectedPATSection byte
-	expectedPMTSection byte
-	hasPAT             bool
-	hasPMT             bool
-	hasInit            bool
-	hasSPS             bool
-	hasPPS             bool
-	pmtMap             map[uint16]uint16 // map[pid]programNumber
-	esMap              map[uint16]byte   // map[pid]streamType
+	init               [][]byte                     // collected packets to initialize a decoder
+	expectedPATSection byte                         // id of next expected PAT section
+	expectedPMTSection byte                         // id of next expected PMT sectino
+	hasPAT             bool                         // MPEG-TS PAT packet stored
+	hasPMT             bool                         // MPEG-TS PMT packet stored
+	pmtMap             map[uint16]uint16            // map[pid]programNumber
+	tspMap             map[uint16]*ElementaryStream // transport stream program map
 }
 
 func NewParser() *Parser {
 	return &Parser{
 		pmtMap: make(map[uint16]uint16),
-		esMap:  make(map[uint16]byte),
+		tspMap: make(map[uint16]*ElementaryStream),
+		init:   make([][]byte, 0, 3),
 	}
 }
 
-// InitData returns data needed for decoder init or nil if the parser is not ready yet
-func (p *Parser) InitData() [][]byte {
-	if !p.hasPAT || !p.hasPMT || !p.hasSPS || !p.hasPPS {
-		return nil
+func (p *Parser) hasInit() bool {
+	if !p.hasPAT || !p.hasPMT {
+		return false
 	}
 
-	return p.init
+	for _, stream := range p.tspMap {
+		if !stream.parser.HasInit() {
+			return false
+		}
+	}
+
+	return true
+}
+
+// InitData returns data needed for decoder init or nil if the parser is not ready yet
+func (p *Parser) InitData() ([][]byte, error) {
+	if !p.hasInit() {
+		return nil, nil
+	}
+
+	// add stream init packets
+	for _, stream := range p.tspMap {
+		packet, err := stream.parser.InitPacket()
+		if err != nil {
+			return nil, err
+		}
+		p.init = append(p.init, packet)
+	}
+
+	return p.init, nil
 }
 
 // Parse processes all MPEGTS packets from a buffer
 func (p *Parser) Parse(data []byte) error {
+	pkt := Packet{}
 	for {
 		if len(data) == 0 {
 			return nil
 		}
-		pkt := Packet{}
 		err := pkt.FromBytes(data)
 		if err != nil {
 			// Incomplete packet, TODO: keep rest data?
@@ -87,19 +114,19 @@ func (p *Parser) Parse(data []byte) error {
 				return err
 			}
 
-		} else if _, ok := p.esMap[pkt.PID]; ok {
+		} else if stream, ok := p.tspMap[pkt.PID]; ok {
 			// Parse PES and store SPS+PPS packet
-			storePacket, err = p.ParsePES(pkt.Payload, pkt.PID)
+			// log.Println("payload", len(pkt.Payload), len(pkt.AdaptationField))
+			err = stream.ParsePES(&pkt)
 			if err != nil {
 				return err
 			}
 		}
 
-		if storePacket {
+		// store init packets and all remaining packets from the buffer after init
+		if storePacket || p.hasInit() {
 			p.init = append(p.init, data[:pkt.Size()])
 		}
-
-		// parse PMT and store
 
 		data = data[pkt.Size():]
 	}
@@ -170,8 +197,14 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 			esInfoLength := binary.BigEndian.Uint16(data[offset:offset+2]) & 0xfff
 			offset += 2 + int(esInfoLength)
 
-			// log.Println("stream type", streamType, "elementary pid", elementaryPID, "esInfoLength", esInfoLength)
-			p.esMap[elementaryPID] = streamType
+			switch streamType {
+			case StreamTypeH264:
+				p.tspMap[elementaryPID] = &ElementaryStream{
+					parser: NewH264Parser(elementaryPID),
+				}
+				log.Println("got H.264 stream, pid", elementaryPID)
+			}
+			//log.Printf("got pid: %d, streamType: 0x%x\n", elementaryPID, streamType)
 
 			if offset >= end {
 				break
@@ -185,98 +218,5 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 			p.hasPMT = true
 		}
 	}
-	return shouldStore, nil
-}
-
-// PES constants
-const (
-	PESStartCode   = 0x000001
-	MaxPayloadSize = PacketLen - 4
-	PESMaxLength   = 200 * 1024
-
-	PESStreamIDAudio = 0xc0
-	PESStreamIDVideo = 0xe0
-)
-
-// AVC NAL constants
-const (
-	NALStartCode  = 0x00000001 // NAL Start code with single zero byte, required for SPS, PPS and first NAL per picture
-	NALHeaderSize = 6
-)
-
-// AVC NAL unit type constants
-const (
-	NALUnitTypeSPS = 7
-	NALUnitTypePPS = 8
-)
-
-func (p *Parser) ParsePES(data []byte, pid uint16) (bool, error) {
-	var shouldStore bool
-
-	if !isPESPayload(data) {
-		return false, nil
-	}
-
-	// start := binary.BigEndian.Uint32(data[0:4])
-	// packetStartCode := start >> 8 & 0xffffff
-	if data[0] != 0x0 || data[1] != 0x0 || data[2] != 0x1 {
-		// log.Println("invalid PES start code")
-		return false, nil
-		// return false, ErrInvalidPacket
-	}
-	offset := 3
-
-	streamID := data[offset]
-	if streamID != PESStreamIDVideo {
-		return false, nil
-	}
-	offset++
-
-	packetLength := int(binary.BigEndian.Uint16(data[offset : offset+2]))
-	// unbounded packet, only allowed for video ES
-	if packetLength == 0 {
-		packetLength = PESMaxLength
-	}
-	offset += 2
-
-	// Just look for NAL units...
-	for {
-		if offset > len(data)-NALHeaderSize {
-			break
-		}
-
-		// Find NAL
-		// start := binary.BigEndian.Uint32(data[offset+1:offset+5]) >> 8
-		if data[offset] == 0x0 && data[offset+1] == 0x0 && data[offset+2] == 0x0 && data[offset+3] == 0x1 {
-			// log.Printf("nal header: 0x%x", data[offset:offset+6])
-
-			offset += 4
-
-			forbiddenZero := data[offset] >> 7 & 1
-			if forbiddenZero != 0 {
-				offset++
-				// log.Println("forbidden zero wasn't zero")
-				continue
-			}
-
-			// refIdc := data[offset] >> 5 & 0x3
-
-			unitType := data[offset] & 0x1f
-			// log.Printf("nal, offset: %x, unit type: %x, ref idc: %x\n", offset, unitType, refIdc)
-			if unitType == NALUnitTypeSPS {
-				log.Println("got SPS")
-				shouldStore = true
-				p.hasSPS = true
-			} else if unitType == NALUnitTypePPS {
-				log.Println("got PPS")
-				shouldStore = true
-				p.hasPPS = true
-			}
-		}
-		offset++
-	}
-
-	// Parse PTS
-	// log.Printf("got ES start, stream id: %x, length: %d, pid: %d\n", streamID, packetLength, pid)
 	return shouldStore, nil
 }

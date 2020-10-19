@@ -1,73 +1,85 @@
 package mpegts
 
-// isPESPayload checks whether the payload is a PES one
-func isPESPayload(i []byte) bool {
-	// Packet is not big enough
-	if len(i) < 3 {
-		return false
-	}
+import (
+	"io"
+	"log"
+)
 
-	// Check prefix
-	return uint32(i[0])<<16|uint32(i[1])<<8|uint32(i[2]) == 1
+// PES constants
+const (
+	PESStartCode   = 0x000001
+	MaxPayloadSize = PacketLen - 4
+	PESMaxLength   = 200 * 1024
+
+	PESStreamIDAudio = 0xc0
+	PESStreamIDVideo = 0xe0
+)
+
+type ElementaryStream struct {
+	parser    CodecParser
+	pesWriter *io.PipeWriter
 }
 
-func EncodeSPSPPS(pid uint16) ([]byte, error) {
-	pkt := Packet{
-		PID:     pid,
-		PUSI:    true,
-		Payload: nil,
-	}
-
-	data := make([]byte, PacketLen)
-	err := pkt.ToBytes(data)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+type CodecParser interface {
+	HasInit() bool
+	InitPacket() ([]byte, error)
+	Parse(*io.PipeReader)
 }
 
-// //sps pps
-// int len = ti->sps_len + ti->pps_len;
-// len = len + 9 + 5;//pes len
-// if (len > TS_PACK_LEN-4) {
-//     printf("pid=%d, pes size=%d is abnormal!!!!\n", pid, len);
-//     return ret;
-// }
-// pos ++;
-// //pid
-// ti->es_pid = pid;
-// tmp = ti->es_pid >> 8;
-// p[pos++] = 0x40 | tmp;
-// tmp = ti->es_pid;
-// p[pos++] = tmp;
-// p[pos] = 0x10;
-// int ad_len = TS_PACK_LEN - 4 - len - 1;
-// if (ad_len > 0) {
-//     p[pos++] = 0x30;
-//     p[pos++] = ad_len;//adaptation length
-//     p[pos++] = 0x00;//
-//     memset(p + pos, 0xFF, ad_len-1);
-//     pos += ad_len - 1;
-// }else{
-//     pos ++;
-// }
+func encodePES(data []byte) ([]byte, error) {
+	// Early check, but MPEG-TS packet will check again
+	if len(data)+9+5 > PacketLen-HeaderLen {
+		return nil, ErrDataTooLong
+	}
+	// len = len + 9 + 5;//pes len
+	return nil, nil
+}
 
-// //pes
-// p[pos++] = 0;
-// p[pos++] = 0;
-// p[pos++] = 1;
-// p[pos++] = stream_id;
-// p[pos++] = 0;//total size
-// p[pos++] = 0;//total size
-// p[pos++] = 0x80;//flag
-// p[pos++] = 0x80;//flag
-// p[pos++] = 5;//header_len
-// p[pos++] = 0;//pts
-// p[pos++] = 0;
-// p[pos++] = 0;
-// p[pos++] = 0;
-// p[pos++] = 0;
-// memcpy(p+pos, ti->sps, ti->sps_len);
-// pos += ti->sps_len;
-// memcpy(p+pos, ti->pps, ti->pps_len);
-// pos += ti->pps_len;
+// Parse PES packet
+// assemble PES stream and call Codec parser
+func (es *ElementaryStream) ParsePES(pkt *Packet) error {
+	payload := pkt.Payload
+	offset := 0
+
+	// expect PES packet start code prefix
+	if pkt.PUSI {
+		// check start code
+		if len(payload) < 6 || payload[0] != 0x0 || payload[1] != 0x0 || payload[2] != 0x1 {
+			return ErrInvalidPacket
+		}
+		offset += 3
+
+		// we are only interested in video codecs right now
+		streamID := payload[offset]
+		if streamID != PESStreamIDVideo {
+			return ErrInvalidPacket
+		}
+		offset += 3
+
+		if es.pesWriter != nil {
+			// closes reader side
+			err := es.pesWriter.Close()
+			if err != nil {
+				log.Println("got err from codec on close:", err)
+			}
+		}
+
+		reader, writer := io.Pipe()
+		es.pesWriter = writer
+
+		// create new parser goroutine
+		go es.parser.Parse(reader)
+	}
+
+	// Didn't yet receive a start packet
+	if es.pesWriter == nil {
+		return nil
+	}
+
+	// Feed bytes to parser synchronously
+	_, err := es.pesWriter.Write(payload[offset:])
+	if err != io.ErrClosedPipe {
+		return err
+	}
+	return nil
+}

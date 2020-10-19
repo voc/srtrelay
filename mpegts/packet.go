@@ -3,7 +3,6 @@ package mpegts
 import (
 	"encoding/binary"
 	"io"
-	"log"
 )
 
 // Packet represents a MPEGTS packet
@@ -31,7 +30,6 @@ const (
 // FromBytes creates a packet from a byte slice
 func (pkt *Packet) FromBytes(b []byte) error {
 	if len(b) < PacketLen {
-		log.Println("pkt too short")
 		return io.ErrUnexpectedEOF
 	}
 
@@ -49,11 +47,15 @@ func (pkt *Packet) FromBytes(b []byte) error {
 		afLength := int(b[offset])
 		pkt.AdaptationField = b[offset : offset+afLength+1]
 		offset += afLength + 1
+	} else {
+		pkt.AdaptationField = nil
 	}
 
 	// has payload
 	if hdr&PayloadHdrMask > 0 {
 		pkt.Payload = b[offset:PacketLen]
+	} else {
+		pkt.Payload = nil
 	}
 
 	return nil

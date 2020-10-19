@@ -39,12 +39,11 @@ func TestParseStreamID(t *testing.T) {
 
 // struct TestRelay{}
 // func (tr* TestRelay) Publish(string) (chan<- []byte, error) {
-
 // }
 
 // func (tr* TestRelay) Subscribe(string) (<-chan []byte, UnsubscribeFunc, error)
-
 // }
-func TestServerImpl_play(t *testing.T) {
-	s := &ServerImpl{ps: TestRelay}
-}
+
+// func TestServerImpl_play(t *testing.T) {
+// 	s := &ServerImpl{ps: TestRelay}
+// }

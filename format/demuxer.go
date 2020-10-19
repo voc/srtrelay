@@ -49,7 +49,10 @@ func (d *Demuxer) FindInit(data []byte) ([][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		res := d.parser.InitData()
+		res, err := d.parser.InitData()
+		if err != nil {
+			return nil, err
+		}
 		return res, nil
 	default:
 		return make([][]byte, 0), nil
