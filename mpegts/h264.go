@@ -62,7 +62,7 @@ func (h *H264Parser) InitPacket() ([]byte, error) {
 	copy(pesData[len(h.sps):], h.pps)
 
 	// encode PES payload
-	pesPayload, err := encodePES(pesData)
+	pesPayload, err := encodeVideoPES(pesData)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (h *H264Parser) Parse(rd *io.PipeReader) {
 	// read remaining bytes
 	buffered := brd.Buffered()
 	if buffered > 0 {
-		tmp := make([]byte, 0, buffered)
+		tmp := make([]byte, buffered)
 		n, _ := brd.Read(tmp)
 		nalBuffer = append(nalBuffer, tmp[:n]...)
 	}

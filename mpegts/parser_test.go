@@ -26,7 +26,7 @@ func TestParser_ParseH264(t *testing.T) {
 		t.Error("Init should not be nil")
 	}
 	numPackets := len(pkts)
-	if numPackets != 20 {
-		t.Errorf("Expected 3 init packets, got %d", numPackets)
+	if numPackets != 32 {
+		t.Errorf("Expected 32 init packets, got %d", numPackets)
 	}
 }

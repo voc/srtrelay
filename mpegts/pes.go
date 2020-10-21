@@ -1,6 +1,7 @@
 package mpegts
 
 import (
+	"encoding/binary"
 	"io"
 	"log"
 )
@@ -9,6 +10,7 @@ import (
 const (
 	PESStartCode   = 0x000001
 	MaxPayloadSize = PacketLen - 4
+	PESHeaderSize  = 6
 	PESMaxLength   = 200 * 1024
 
 	PESStreamIDAudio = 0xc0
@@ -26,13 +28,27 @@ type CodecParser interface {
 	Parse(*io.PipeReader)
 }
 
-func encodePES(data []byte) ([]byte, error) {
+// Encode video codec PES with custom payload
+func encodeVideoPES(data []byte) ([]byte, error) {
 	// Early check, but MPEG-TS packet will check again
-	if len(data)+9+5 > PacketLen-HeaderLen {
+	if len(data)+PESHeaderSize > PacketLen-HeaderLen {
 		return nil, ErrDataTooLong
 	}
-	// len = len + 9 + 5;//pes len
-	return nil, nil
+
+	pes := make([]byte, PESHeaderSize, MaxPayloadSize)
+
+	// write pes header (Video only for now)
+	offset := 0
+	tmp := uint32(PESStartCode<<8) | PESStreamIDVideo
+	binary.BigEndian.PutUint32(pes[offset:offset+4], tmp)
+	offset += 4
+
+	// write pes length (can be 0 only for Video packets)
+	binary.BigEndian.PutUint16(pes[offset:offset+2], 0)
+
+	pes = append(pes, data...)
+
+	return pes, nil
 }
 
 // Parse PES packet
