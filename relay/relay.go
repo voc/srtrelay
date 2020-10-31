@@ -20,14 +20,16 @@ type Relay interface {
 
 // RelayImpl represents a multi-channel stream relay
 type RelayImpl struct {
-	mutex    sync.Mutex
-	channels map[string]*Channel
+	mutex      sync.Mutex
+	channels   map[string]*Channel
+	buffersize uint
 }
 
 // NewRelay creates a relay
-func NewRelay() Relay {
+func NewRelay(buffersize uint) Relay {
 	return &RelayImpl{
-		channels: make(map[string]*Channel),
+		channels:   make(map[string]*Channel),
+		buffersize: buffersize,
 	}
 }
 
@@ -40,7 +42,7 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 		return nil, StreamAlreadyExists
 	}
 
-	channel := NewChannel()
+	channel := NewChannel(s.buffersize)
 	s.channels[name] = channel
 
 	ch := make(chan []byte, 0)

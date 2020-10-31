@@ -67,57 +67,21 @@ func (h *H264Parser) InitPacket() ([]byte, error) {
 		return nil, err
 	}
 
-	// create MPEG-TS Packet
-	pkt := Packet{
-		PID:     h.pid,
-		PUSI:    true,
-		Payload: pesPayload,
+	// pad with adaptationField
+	adaptationLen := MaxPayloadSize - len(pesPayload)
+	adaptationField := make([]byte, adaptationLen)
+	adaptationField[0] = 0x3 << 6
+	for i := 0; i < adaptationLen-1; i++ {
+		adaptationField[i+1] = 0xff
 	}
 
-	// //sps pps
-	// int len = ti->sps_len + ti->pps_len;
-	// if (len > TS_PACK_LEN-4) {
-	//     printf("pid=%d, pes size=%d is abnormal!!!!\n", pid, len);
-	//     return ret;
-	// }
-	// pos ++;
-	// //pid
-	// ti->es_pid = pid;
-	// tmp = ti->es_pid >> 8;
-	// p[pos++] = 0x40 | tmp;
-	// tmp = ti->es_pid;
-	// p[pos++] = tmp;
-	// p[pos] = 0x10;
-	// int ad_len = TS_PACK_LEN - 4 - len - 1;
-	// if (ad_len > 0) {
-	//     p[pos++] = 0x30;
-	//     p[pos++] = ad_len;//adaptation length
-	//     p[pos++] = 0x00;//
-	//     memset(p + pos, 0xFF, ad_len-1);
-	//     pos += ad_len - 1;
-	// }else{
-	//     pos ++;
-	// }
-
-	// //pes
-	// p[pos++] = 0;
-	// p[pos++] = 0;
-	// p[pos++] = 1;
-	// p[pos++] = stream_id;
-	// p[pos++] = 0;//total size
-	// p[pos++] = 0;//total size
-	// p[pos++] = 0x80;//flag
-	// p[pos++] = 0x80;//flag
-	// p[pos++] = 5;//header_len
-	// p[pos++] = 0;//pts
-	// p[pos++] = 0;
-	// p[pos++] = 0;
-	// p[pos++] = 0;
-	// p[pos++] = 0;
-	// memcpy(p+pos, ti->sps, ti->sps_len);
-	// pos += ti->sps_len;
-	// memcpy(p+pos, ti->pps, ti->pps_len);
-	// pos += ti->pps_len;
+	// create MPEG-TS Packet
+	pkt := Packet{
+		PID:             h.pid,
+		PUSI:            true,
+		Payload:         pesPayload,
+		AdaptationField: adaptationField,
+	}
 
 	data := make([]byte, PacketLen)
 	err = pkt.ToBytes(data)
@@ -126,14 +90,6 @@ func (h *H264Parser) InitPacket() ([]byte, error) {
 	}
 	return data, nil
 }
-
-// func readByte(rd io.Reader) (byte, error) {
-// 	b := make([]byte, 1)
-// 	_, err := rd.Read(b)
-// 	return b[0], err
-// }
-
-// var counter = 0
 
 // Parse reads H.264 PPS and SPS from PES payloads
 func (h *H264Parser) Parse(rd *io.PipeReader) {
@@ -185,7 +141,6 @@ func (h *H264Parser) Parse(rd *io.PipeReader) {
 			case NALUnitTypeSPS:
 				h.sps = nalBuffer
 				nalBuffer = nil
-				log.Println("got SPS len", len(h.sps))
 				if h.sps != nil && h.pps != nil {
 					close(h.done)
 					rd.Close()
@@ -195,7 +150,6 @@ func (h *H264Parser) Parse(rd *io.PipeReader) {
 			case NALUnitTypePPS:
 				h.pps = nalBuffer
 				nalBuffer = nil
-				log.Println("got PPS len", len(h.pps))
 				if h.sps != nil && h.pps != nil {
 					close(h.done)
 					rd.Close()
@@ -207,19 +161,20 @@ func (h *H264Parser) Parse(rd *io.PipeReader) {
 			if nalType == NALUnitTypeSPS || nalType == NALUnitTypePPS {
 				// log.Println("got SPS/PPS")
 				nalBuffer = make([]byte, 0, 200)
+				nalBuffer = append(nalBuffer, 0x0)
 
-				startSlice := nalBuffer[:NALHeaderSize]
 				if skippedZero {
 					nalBuffer = append(nalBuffer, 0x0)
-					startSlice = nalBuffer[1 : NALHeaderSize+1]
 				}
 
 				// ignore error, because the bytes should be buffered through peek
+				startSlice := make([]byte, NALHeaderSize)
 				n, _ := brd.Read(startSlice)
 				if n < NALHeaderSize {
 					log.Fatal("Short read, should be buffered")
 					return
 				}
+				nalBuffer = append(nalBuffer, startSlice...)
 			}
 			previousNalType = nalType
 		}
@@ -259,10 +214,8 @@ func (h *H264Parser) Parse(rd *io.PipeReader) {
 	switch previousNalType {
 	case NALUnitTypeSPS:
 		h.sps = nalBuffer
-		log.Println("got SPS len on end", len(h.sps))
 	case NALUnitTypePPS:
 		h.pps = nalBuffer
-		log.Println("got PPS len on end", len(h.pps))
 	}
 
 	if h.sps != nil && h.pps != nil {

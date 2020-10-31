@@ -170,7 +170,6 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 		shouldStore = true
 		p.expectedPATSection = hdr.sectionNumber + 1
 		if hdr.sectionNumber == hdr.lastSectionNumber {
-			log.Println("got PAT")
 			p.hasPAT = true
 		}
 
@@ -202,9 +201,7 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 				p.tspMap[elementaryPID] = &ElementaryStream{
 					parser: NewH264Parser(elementaryPID),
 				}
-				log.Println("got H.264 stream, pid", elementaryPID)
 			}
-			//log.Printf("got pid: %d, streamType: 0x%x\n", elementaryPID, streamType)
 
 			if offset >= end {
 				break
@@ -214,7 +211,6 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 		shouldStore = true
 		p.expectedPMTSection = hdr.sectionNumber + 1
 		if hdr.sectionNumber == hdr.lastSectionNumber {
-			log.Println("got PMT")
 			p.hasPMT = true
 		}
 	}

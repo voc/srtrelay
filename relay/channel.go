@@ -8,8 +8,9 @@ import (
 type UnsubscribeFunc func()
 
 type Channel struct {
-	mutex sync.Mutex
-	subs  Subs
+	mutex      sync.Mutex
+	subs       Subs
+	buffersize uint
 }
 type Subs []chan []byte
 
@@ -37,15 +38,19 @@ func (subs Subs) Remove(sub chan []byte) Subs {
 	return subs[:len(subs)-1]     // Truncate slice.
 }
 
-func NewChannel() *Channel {
-	return &Channel{subs: make([]chan []byte, 0, 10)}
+func NewChannel(buffersize uint) *Channel {
+	return &Channel{
+		subs:       make([]chan []byte, 0, 10),
+		buffersize: buffersize,
+	}
 }
 
 // Sub subscribes to a channel
 func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	sub := make(chan []byte, 80) // about 300ms at 3Mbit/s
+	channelbuffer := ch.buffersize / 1316
+	sub := make(chan []byte, channelbuffer)
 	ch.subs = append(ch.subs, sub)
 
 	var unsub UnsubscribeFunc = func() {

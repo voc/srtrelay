@@ -7,7 +7,7 @@ import (
 )
 
 func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
-	relay := NewRelay()
+	relay := NewRelay(uint(1316 * 50))
 	data := []byte{1, 2, 3, 4}
 
 	pub, err := relay.Publish("test")
@@ -45,7 +45,7 @@ func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
 }
 
 func TestRelayImpl_PublisherClose(t *testing.T) {
-	relay := NewRelay()
+	relay := NewRelay(0)
 
 	ch, _ := relay.Publish("test")
 	sub, unsub, _ := relay.Subscribe("test")
@@ -68,7 +68,7 @@ func TestRelayImpl_PublisherClose(t *testing.T) {
 }
 
 func TestRelayImpl_DoublePublish(t *testing.T) {
-	relay := NewRelay()
+	relay := NewRelay(0)
 	relay.Publish("foo")
 	_, err := relay.Publish("foo")
 
@@ -78,7 +78,7 @@ func TestRelayImpl_DoublePublish(t *testing.T) {
 }
 
 func TestRelayImpl_SubscribeNonExisting(t *testing.T) {
-	relay := NewRelay()
+	relay := NewRelay(0)
 
 	_, _, err := relay.Subscribe("foobar")
 	if err != StreamNotExisting {

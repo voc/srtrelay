@@ -100,8 +100,6 @@ func (pkt *Packet) ToBytes(data []byte) error {
 	copy(data[offset:offset+payloadLength], pkt.Payload)
 	offset += payloadLength
 
-	// fill remainder?
-
 	return nil
 }
 

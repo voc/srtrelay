@@ -41,8 +41,8 @@ type ServerImpl struct {
 }
 
 // NewServer creates a server
-func NewServer() Server {
-	ps := relay.NewRelay()
+func NewServer(buffersize uint) Server {
+	ps := relay.NewRelay(buffersize)
 	return &ServerImpl{ps}
 }
 
@@ -119,7 +119,7 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 		buf, ok := <-sub
 
 		buffered := len(sub)
-		if buffered > 40 {
+		if buffered > 144 {
 			log.Println("late in buffer", len(sub))
 		}
 

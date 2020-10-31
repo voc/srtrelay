@@ -46,6 +46,9 @@ func encodeVideoPES(data []byte) ([]byte, error) {
 	// write pes length (can be 0 only for Video packets)
 	binary.BigEndian.PutUint16(pes[offset:offset+2], 0)
 
+	// magic?! flag + pts
+	// pes = append(pes, 0x80, 0x80, 5, 0, 0, 0, 0, 0)
+
 	pes = append(pes, data...)
 
 	return pes, nil

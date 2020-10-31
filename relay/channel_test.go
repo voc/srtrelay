@@ -6,7 +6,7 @@ import (
 )
 
 func TestChannel_PubSub(t *testing.T) {
-	ch := NewChannel()
+	ch := NewChannel(uint(1316 * 50))
 
 	// sub
 	out, unsub := ch.Sub()
@@ -33,7 +33,7 @@ func TestChannel_PubSub(t *testing.T) {
 }
 
 func TestChannel_DropOnOverflow(t *testing.T) {
-	ch := NewChannel()
+	ch := NewChannel(uint(1316 * 50))
 
 	sub, _ := ch.Sub()
 	capacity := cap(sub) + 1
@@ -60,7 +60,7 @@ func TestChannel_DropOnOverflow(t *testing.T) {
 }
 
 func TestChannel_Close(t *testing.T) {
-	ch := NewChannel()
+	ch := NewChannel(0)
 	sub1, _ := ch.Sub()
 	_, _ = ch.Sub()
 
