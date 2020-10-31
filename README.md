@@ -15,6 +15,16 @@ ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:8090?streamid=test/publish
 ffplay srt://localhost:8090?streamid=test/play
 ```
 
+## Dependencies
+
+**Debian 10**:
+  - apt install libsrt1-openssl
+
+## Build
+```
+go build
+```
+
 ## Design Ideas
   - Just a 1:n relay, one publisher (push), multiple subscribers (pull)
   - No decoding -> use ffmpeg instead
