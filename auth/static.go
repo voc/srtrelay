@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"log"
-
 	"github.com/voc/srtrelay/stream"
 )
 
@@ -23,7 +21,6 @@ func NewStaticAuth(config StaticAuthConfig) *staticAuth {
 // Implement Authenticator
 func (auth *staticAuth) Authenticate(streamid stream.StreamID) bool {
 	for _, allowed := range auth.allow {
-		log.Println("test", streamid, allowed)
 		if streamid.Match(allowed) {
 			return true
 		}
