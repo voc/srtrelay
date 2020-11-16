@@ -3,27 +3,40 @@ Streaming-Relay for the SRT-protocol
 
 **EXPERIMENTAL AT BEST, use at your own risk**
 
+## Dependencies
+**Debian 10**:
+  - apt install libsrt1-openssl
+
+**Gentoo**:
+  - emerge net-libs/srt
+
+## Build
+```
+go build
+```
+
 ## Usage
 ```bash
 # relay
 ./srtrelay
 
 # publisher
-ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:8090?streamid=test/publish
+ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:1337?streamid=publish/test
 
 # subscriber
-ffplay srt://localhost:8090?streamid=test/play
+ffplay srt://localhost:1337?streamid=play/test
 ```
 
-## Dependencies
-
-**Debian 10**:
-  - apt install libsrt1-openssl
-
-## Build
+### Commandline Flags
+```bash
+# List available flags
+./srtrelay -h
 ```
-go build
-```
+
+### Configuration
+Please take a look at [config.toml.example](config.toml.example) to learn more about configuring srtrelay.
+
+The configuration file can be placed under *config.toml* in the current working directory, at */etc/srtrelay/config.toml* or at a custom location specified via the *-config* flag.
 
 ## Design Ideas
   - Just a 1:n relay, one publisher (push), multiple subscribers (pull)

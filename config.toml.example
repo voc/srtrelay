@@ -1,0 +1,37 @@
+[app]
+# Relay listen address
+#address =  "127.0.0.1"
+
+# Relay listen port
+#port = 1337
+
+# SRT protocol latency in ms
+# This should be a multiple of your expected RTT because SRT needs some time
+# to send and receive acknowledgements and retransmits to be effective.
+#latency = 300
+
+# Relay buffer size in bytes, 384000 -> 1 second @ 3Mbits
+# This determines the maximum delay tolerance for connected clients.
+# Clients which are more than buffersize behind the live edge are disconnected.
+#buffersize = 384000
+
+[auth]
+# Choose between available auth types (static and http)
+# for further config options see below
+#type = "static"
+
+[auth.static]
+# Streams are authenticated using a static list of allowed streamids
+# Each pattern is matched to the client streamid
+# in the form of <mode>/<stream-name>/<password>
+# Allows using * as wildcard (will match across slashes)
+#allow = ["*", "publish/foo/bar", "play/*"]
+
+[auth.http]
+# Streams are authenticated using HTTP callbacks
+# nginx-rtmp on_publish/on_subscribe compatible http auth
+#url = "http://localhost/auth"
+
+# static
+# the full url with be <url>/<app>/<stream-name>
+#app = "stream"

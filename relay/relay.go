@@ -7,29 +7,37 @@ import (
 )
 
 var (
-	InvalidStreamID     = errors.New("Invalid stream ID")
-	InvalidMode         = errors.New("Invalid mode")
 	StreamAlreadyExists = errors.New("Stream already exists")
 	StreamNotExisting   = errors.New("Stream does not exist")
 )
 
+type StreamStat struct {
+	name    string
+	clients int
+}
+
+type RelayConfig struct {
+	Buffersize uint
+}
+
 type Relay interface {
 	Publish(string) (chan<- []byte, error)
 	Subscribe(string) (<-chan []byte, UnsubscribeFunc, error)
+	GetStatistics(string) []*StreamStat
 }
 
 // RelayImpl represents a multi-channel stream relay
 type RelayImpl struct {
-	mutex      sync.Mutex
-	channels   map[string]*Channel
-	buffersize uint
+	mutex    sync.Mutex
+	channels map[string]*Channel
+	config   *RelayConfig
 }
 
 // NewRelay creates a relay
-func NewRelay(buffersize uint) Relay {
+func NewRelay(config *RelayConfig) Relay {
 	return &RelayImpl{
-		channels:   make(map[string]*Channel),
-		buffersize: buffersize,
+		channels: make(map[string]*Channel),
+		config:   config,
 	}
 }
 
@@ -42,7 +50,7 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 		return nil, StreamAlreadyExists
 	}
 
-	channel := NewChannel(s.buffersize)
+	channel := NewChannel(s.config.Buffersize)
 	s.channels[name] = channel
 
 	ch := make(chan []byte, 0)
@@ -80,4 +88,8 @@ func (s *RelayImpl) Subscribe(name string) (<-chan []byte, UnsubscribeFunc, erro
 	}
 	ch, unsub := channel.Sub()
 	return ch, unsub, nil
+}
+
+func (s *RelayImpl) GetStatistics(string) []*StreamStat {
+	return nil
 }

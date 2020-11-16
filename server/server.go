@@ -5,113 +5,148 @@ package server
 import "C"
 
 import (
-	"errors"
+	"context"
+	"fmt"
 	"log"
-	"strings"
+	"net"
+	"strconv"
 
 	"github.com/haivision/srtgo"
+	"github.com/voc/srtrelay/auth"
 	"github.com/voc/srtrelay/format"
 	"github.com/voc/srtrelay/relay"
+	"github.com/voc/srtrelay/stream"
 )
 
 const (
-	StreamIDSockOpt = 46
-
-	// PacketSize = 1456
+	// Make this configurable? max is 1456
 	PacketSize = 1316 // TS_UDP_LEN
 )
 
-var (
-	InvalidStreamID     = errors.New("Invalid stream ID")
-	InvalidMode         = errors.New("Invalid mode")
-	StreamAlreadyExists = errors.New("Stream already exists")
-	StreamNotExisting   = errors.New("Stream does not exist")
-)
+type Config struct {
+	Server ServerConfig
+	Relay  relay.RelayConfig
+}
 
-const statsPeriodMs = 2
+type ServerConfig struct {
+	Address string
+	Port    uint16
+	Latency uint
+	Auth    auth.Authenticator
+}
 
 // Server is an interface for a srt relay server
 type Server interface {
-	Handle(*srtgo.SrtSocket)
+	Listen(context.Context) error
+	Handle(*srtgo.SrtSocket, *net.UDPAddr)
 }
 
 // ServerImpl implements the Server interface
 type ServerImpl struct {
-	ps relay.Relay
+	config *ServerConfig
+	relay  relay.Relay
 }
 
 // NewServer creates a server
-func NewServer(buffersize uint) Server {
-	ps := relay.NewRelay(buffersize)
-	return &ServerImpl{ps}
+func NewServer(config *Config) Server {
+	r := relay.NewRelay(&config.Relay)
+	return &ServerImpl{
+		relay:  r,
+		config: &config.Server,
+	}
 }
 
-// Mode - client mode
-type Mode uint8
+// Listen sets up a SRT socket in listen mode
+func (s *ServerImpl) Listen(ctx context.Context) error {
+	options := make(map[string]string)
+	options["blocking"] = "0"
+	options["transtype"] = "live"
+	options["latency"] = strconv.Itoa(int(s.config.Latency))
 
-const (
-	_ Mode = iota
-	ModePlay
-	ModePublish
-)
-
-// ParseStreamID separates mode and stream name
-func ParseStreamID(streamID string) (string, Mode, error) {
-	split := strings.Split(streamID, "/")
-	if len(split) != 2 {
-		return "", 0, InvalidStreamID
+	sck := srtgo.NewSrtSocket(s.config.Address, s.config.Port, options)
+	err := sck.Listen(1)
+	if err != nil {
+		return fmt.Errorf("Listen failed: %v", err)
 	}
-	name := split[0]
-	modeStr := split[1]
 
-	var mode Mode
-	switch modeStr {
-	case "play":
-		mode = ModePlay
-	case "publish":
-		mode = ModePublish
-	default:
-		return "", 0, InvalidMode
-	}
-	return name, mode, nil
+	go func() {
+		<-ctx.Done()
+		sck.Close()
+	}()
+
+	go func() {
+		for {
+			sock, addr, err := sck.Accept()
+			if err != nil {
+				// exit silently if context closed
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				log.Fatalln("accept failed", err)
+			}
+			go s.Handle(sock, addr)
+		}
+	}()
+	return nil
+}
+
+// SRTConn wraps an srtsocket with additional state
+type srtConn struct {
+	socket   *srtgo.SrtSocket
+	address  *net.UDPAddr
+	streamid *stream.StreamID
 }
 
 // Handle srt client connection
-func (s *ServerImpl) Handle(sock *srtgo.SrtSocket) {
+func (s *ServerImpl) Handle(sock *srtgo.SrtSocket, addr *net.UDPAddr) {
+	var streamid stream.StreamID
 	defer sock.Close()
 
-	streamid, err := sock.GetSockOptString(C.SRTO_STREAMID)
+	idstring, err := sock.GetSockOptString(C.SRTO_STREAMID)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	name, mode, err := ParseStreamID(streamid)
-	if err != nil {
+	// Parse stream id
+	if err := streamid.FromString(idstring); err != nil {
 		log.Println(err)
 		return
 	}
 
-	switch mode {
-	case ModePlay:
-		err = s.play(name, sock)
-	case ModePublish:
-		err = s.publish(name, sock)
+	// Check authentication
+	if !s.config.Auth.Authenticate(streamid) {
+		log.Printf("%s - Stream '%s' access denied\n", addr, streamid)
+		return
+	}
+
+	conn := &srtConn{
+		socket:   sock,
+		address:  addr,
+		streamid: &streamid,
+	}
+
+	switch streamid.Mode() {
+	case stream.ModePlay:
+		err = s.play(conn)
+	case stream.ModePublish:
+		err = s.publish(conn)
 	}
 	if err != nil {
-		log.Println(err)
+		log.Printf("%s - %v", conn.address, err)
 	}
 }
 
 // play a stream from the server
-func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
-	sub, unsubscribe, err := s.ps.Subscribe(name)
+func (s *ServerImpl) play(conn *srtConn) error {
+	sub, unsubscribe, err := s.relay.Subscribe(conn.streamid.Name())
 	if err != nil {
 		return err
 	}
 	defer unsubscribe()
-
-	log.Println("Subscribe", name)
+	log.Printf("%s - play %s\n", conn.address, conn.streamid.Name())
 
 	demux := format.NewDemuxer()
 	playing := false
@@ -120,24 +155,25 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 
 		buffered := len(sub)
 		if buffered > 144 {
-			log.Println("late in buffer", len(sub))
+			log.Printf("%s - %d packets late in buffer\n", conn.address, len(sub))
 		}
 
 		// Upstream closed, drop connection
 		if !ok {
+			log.Println("dropping", conn.address)
 			return nil
 		}
 
 		// Find synchronization point
+		// TODO: implement timeout for initial sync
 		if !playing {
 			init, err := demux.FindInit(buf)
 			if err != nil {
 				return err
 			} else if init != nil {
-				log.Println("got init", len(init))
 				for i := range init {
 					buf := init[i]
-					sock.Write(buf, len(buf))
+					conn.socket.Write(buf, len(buf))
 				}
 				playing = true
 			} else {
@@ -146,27 +182,32 @@ func (s *ServerImpl) play(name string, sock *srtgo.SrtSocket) error {
 		}
 
 		// Write to socket
-		sock.Write(buf, len(buf))
+		_, err := conn.socket.Write(buf, len(buf))
+		if err != nil {
+			return err
+		}
 	}
 }
 
 // publish a stream to the server
-func (s *ServerImpl) publish(name string, sock *srtgo.SrtSocket) error {
-	pub, err := s.ps.Publish(name)
+func (s *ServerImpl) publish(conn *srtConn) error {
+	pub, err := s.relay.Publish(conn.streamid.Name())
 	if err != nil {
 		return err
 	}
 	defer close(pub)
+	log.Printf("%s - publish %s\n", conn.address, conn.streamid.Name())
 
-	log.Println("Publish", name)
 	for {
+		// Push read buffers to all clients via the publish channel
+		// a ringbuffer would probably be more efficient
 		buf := make([]byte, PacketSize)
-		n, err := sock.Read(buf, PacketSize)
+		n, err := conn.socket.Read(buf, PacketSize)
 		if err != nil {
-			log.Println(err)
-			return nil
+			return err
 		}
-		// EOF
+
+		// handle EOF
 		if n == 0 {
 			return nil
 		}

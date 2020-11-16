@@ -1,41 +1,96 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"io/ioutil"
 	"log"
-	"strconv"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/haivision/srtgo"
+	"github.com/voc/srtrelay/config"
+	"github.com/voc/srtrelay/relay"
 	"github.com/voc/srtrelay/server"
 )
 
+func handleSignal(ctx context.Context, cancel context.CancelFunc) {
+	// Set up channel on which to send signal notifications.
+	// We must use a buffered channel or risk missing the signal
+	// if we're not ready to receive when the signal is sent.
+	c := make(chan os.Signal, 1)
+	signal.Notify(c,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case s := <-c:
+				log.Println("caught signal", s)
+				if s == syscall.SIGHUP {
+					continue
+				}
+				cancel()
+			}
+		}
+	}()
+}
+
 func main() {
-	var port = flag.Int("port", 1337, "relay port (default 1337)")
-	var latency = flag.Int("latency", 300, "srt latency in ms (default 300)")
+	// allow specifying config path
+	configFlags := flag.NewFlagSet("config", flag.ContinueOnError)
+	configFlags.SetOutput(ioutil.Discard)
+	configPath := configFlags.String("config", "config.toml", "")
+	configFlags.Parse(os.Args[1:])
+
+	// parse config
+	conf, err := config.Parse([]string{*configPath, "/etc/srtrelay/config.toml"})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// flag just for usage
+	flag.String("config", "config.toml", "path to config file")
+
+	// actual flags, use config as default and storage
+	flag.StringVar(&conf.App.Address, "address", conf.App.Address, "relay bind address")
+	flag.UintVar(&conf.App.Port, "port", conf.App.Port, "relay port")
+	flag.UintVar(&conf.App.Latency, "latency", conf.App.Latency, "srt protocol latency in ms")
+	flag.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
+		`relay buffer size in bytes, determines maximum delay of a client`)
 	flag.Parse()
 
-	options := make(map[string]string)
-	options["blocking"] = "0"
-	options["transtype"] = "live"
-	options["latency"] = strconv.Itoa(*latency)
+	serverConfig := server.Config{
+		Server: server.ServerConfig{
+			Address: conf.App.Address,
+			Port:    uint16(conf.App.Port),
+			Latency: conf.App.Latency,
+			Auth:    config.GetAuthenticator(conf.Auth),
+		},
+		Relay: relay.RelayConfig{
+			Buffersize: conf.App.Buffersize, // 1s @ 3Mbits/
+		},
+	}
 
-	address := "0.0.0.0"
-	buffersize := uint(384000) // 1s @ 3Mbits/
+	// setup graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	handleSignal(ctx, cancel)
+	defer cancel()
 
-	sck := srtgo.NewSrtSocket(address, uint16(*port), options)
-	err := sck.Listen(1)
-	defer sck.Close()
+	// create server
+	server := server.NewServer(&serverConfig)
+	err = server.Listen(ctx)
 	if err != nil {
-		log.Fatalln("listen failed", err)
+		log.Fatal(err)
 	}
-	log.Printf("Listening on %s:%d\n", address, *port)
+	log.Printf("Listening on %s:%d\n", conf.App.Address, conf.App.Port)
 
-	server := server.NewServer(buffersize)
-	for {
-		sock, err := sck.Accept()
-		if err != nil {
-			log.Fatalln("accept failed", err)
-		}
-		go server.Handle(sock)
-	}
+	// Wait for graceful shutdown
+	<-ctx.Done()
+	time.Sleep(200 * time.Millisecond)
 }
