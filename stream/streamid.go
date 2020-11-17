@@ -21,6 +21,17 @@ const (
 	ModePublish
 )
 
+func (m Mode) String() string {
+	switch m {
+	case ModePlay:
+		return "play"
+	case ModePublish:
+		return "publish"
+	default:
+		return "unknown"
+	}
+}
+
 // StreamID represents a connection tuple
 type StreamID struct {
 	str      string

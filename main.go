@@ -65,12 +65,17 @@ func main() {
 		`relay buffer size in bytes, determines maximum delay of a client`)
 	flag.Parse()
 
+	auth, err := config.GetAuthenticator(conf.Auth)
+	if err != nil {
+		log.Println(err)
+	}
+
 	serverConfig := server.Config{
 		Server: server.ServerConfig{
 			Address: conf.App.Address,
 			Port:    uint16(conf.App.Port),
 			Latency: conf.App.Latency,
-			Auth:    config.GetAuthenticator(conf.Auth),
+			Auth:    auth,
 		},
 		Relay: relay.RelayConfig{
 			Buffersize: conf.App.Buffersize, // 1s @ 3Mbits/

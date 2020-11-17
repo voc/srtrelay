@@ -4,7 +4,7 @@ import (
 	"github.com/voc/srtrelay/stream"
 )
 
-type staticAuth struct {
+type StaticAuth struct {
 	allow []string
 }
 
@@ -12,14 +12,18 @@ type StaticAuthConfig struct {
 	Allow []string
 }
 
-func NewStaticAuth(config StaticAuthConfig) *staticAuth {
-	return &staticAuth{
+// NewStaticAuth creates an Authenticator with a static config backend
+func NewStaticAuth(config StaticAuthConfig) *StaticAuth {
+	return &StaticAuth{
 		allow: config.Allow,
 	}
 }
 
 // Implement Authenticator
-func (auth *staticAuth) Authenticate(streamid stream.StreamID) bool {
+
+// Authenticate tries to match the stream id against the locally
+// configured matches in the allowlist.
+func (auth *StaticAuth) Authenticate(streamid stream.StreamID) bool {
 	for _, allowed := range auth.allow {
 		if streamid.Match(allowed) {
 			return true

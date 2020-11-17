@@ -1,11 +1,11 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
 	"github.com/pelletier/go-toml"
 	"github.com/voc/srtrelay/auth"
@@ -23,42 +23,22 @@ type AppConfig struct {
 	Buffersize uint
 }
 
-type AuthType int
-
-const (
-	AuthTypeStatic AuthType = iota
-	AuthTypeHttp
-)
-
-func (a *AuthType) UnmarshalTOML(src interface{}) error {
-	log.Println("got", src)
-	switch v := src.(type) {
-	case string:
-		if v == "static" {
-			*a = AuthTypeStatic
-		} else if v == "http" {
-			*a = AuthTypeHttp
-		} else {
-			return fmt.Errorf("Unknown type '%s'", v)
-		}
-		return nil
-	default:
-	}
-	return errors.New("Unknown type")
-}
-
 type AuthConfig struct {
-	Type   AuthType
+	Type   string
 	Static auth.StaticAuthConfig
-	Http   auth.HttpAuthConfig
+	HTTP   auth.HTTPAuthConfig
 }
 
-func GetAuthenticator(conf AuthConfig) auth.Authenticator {
-	if conf.Type == AuthTypeHttp {
-		return auth.NewHttpAuth(conf.Http)
+// GetAuthenticator creates a new authenticator according to AuthConfig
+func GetAuthenticator(conf AuthConfig) (auth.Authenticator, error) {
+	switch conf.Type {
+	case "static":
+		return auth.NewStaticAuth(conf.Static), nil
+	case "http":
+		return auth.NewHTTPAuth(conf.HTTP), nil
+	default:
+		return nil, fmt.Errorf("Unknown auth type '%v'", conf.Type)
 	}
-
-	return auth.NewStaticAuth(conf.Static)
 }
 
 // Parse tries to find and parse config from paths in order
@@ -73,9 +53,16 @@ func Parse(paths []string) (*Config, error) {
 			Buffersize: 384000,
 		},
 		Auth: AuthConfig{
-			Type: AuthTypeStatic,
+			Type: "static",
 			Static: auth.StaticAuthConfig{
+				// Allow everything by default
 				Allow: []string{"*"},
+			},
+			HTTP: auth.HTTPAuthConfig{
+				URL:           "http://localhost:8080/publish",
+				Timeout:       time.Second,
+				Application:   "stream",
+				PasswordParam: "auth",
 			},
 		},
 	}

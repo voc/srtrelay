@@ -28,10 +28,16 @@
 #allow = ["*", "publish/foo/bar", "play/*"]
 
 [auth.http]
-# Streams are authenticated using HTTP callbacks
-# nginx-rtmp on_publish/on_subscribe compatible http auth
-#url = "http://localhost/auth"
+# Streams are authenticated using HTTP POST calls against this URL
+# Should be compatible to nginx-rtmp on_publish/on_subscribe directives
+#url = "http://localhost:8080/publish"
 
-# static
-# the full url with be <url>/<app>/<stream-name>
-#app = "stream"
+# auth timeout duration
+#timeout = "1s"
+
+# Value of the 'app' form-field to send in the POST request
+# Needed for compatibility with the RTMP-application field
+#application = "stream"
+
+# Key of the form-field to send the stream password in
+#passwordParam = "auth"
