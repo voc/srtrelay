@@ -38,6 +38,9 @@ Please take a look at [config.toml.example](config.toml.example) to learn more a
 
 The configuration file can be placed under *config.toml* in the current working directory, at */etc/srtrelay/config.toml* or at a custom location specified via the *-config* flag.
 
+### API
+See [docs/API.md](docs/API.md) for more information about the API.
+
 ## Design Ideas
   - Just a 1:n relay, one publisher (push), multiple subscribers (pull)
   - No decoding -> use ffmpeg instead

@@ -14,6 +14,7 @@ import (
 type Config struct {
 	App  AppConfig
 	Auth AuthConfig
+	API  APIConfig
 }
 
 type AppConfig struct {
@@ -26,6 +27,12 @@ type AuthConfig struct {
 	Type   string
 	Static auth.StaticAuthConfig
 	HTTP   auth.HTTPAuthConfig
+}
+
+type APIConfig struct {
+	Enabled bool
+	Address string
+	Port    uint
 }
 
 // GetAuthenticator creates a new authenticator according to AuthConfig
@@ -61,6 +68,10 @@ func Parse(paths []string) (*Config, error) {
 				Application:   "stream",
 				PasswordParam: "auth",
 			},
+		},
+		API: APIConfig{
+			Enabled: true,
+			Address: ":8080",
 		},
 	}
 

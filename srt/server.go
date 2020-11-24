@@ -39,6 +39,7 @@ type ServerConfig struct {
 type Server interface {
 	Listen(context.Context) error
 	Handle(*srtgo.SrtSocket, *net.UDPAddr)
+	GetStatistics() []*relay.StreamStatistics
 }
 
 // ServerImpl implements the Server interface
@@ -245,4 +246,8 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 
 		pub <- buf[:n]
 	}
+}
+
+func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
+	return s.relay.GetStatistics()
 }

@@ -4,17 +4,13 @@ import (
 	"errors"
 	"log"
 	"sync"
+	"time"
 )
 
 var (
 	StreamAlreadyExists = errors.New("Stream already exists")
 	StreamNotExisting   = errors.New("Stream does not exist")
 )
-
-type StreamStat struct {
-	name    string
-	clients int
-}
 
 type RelayConfig struct {
 	Buffersize uint
@@ -23,7 +19,13 @@ type RelayConfig struct {
 type Relay interface {
 	Publish(string) (chan<- []byte, error)
 	Subscribe(string) (<-chan []byte, UnsubscribeFunc, error)
-	GetStatistics(string) []*StreamStat
+	GetStatistics() []*StreamStatistics
+}
+
+type StreamStatistics struct {
+	Name    string    `json:"name"`
+	Clients int       `json:"clients"`
+	Created time.Time `json:"created"`
 }
 
 // RelayImpl represents a multi-channel stream relay
@@ -90,6 +92,19 @@ func (s *RelayImpl) Subscribe(name string) (<-chan []byte, UnsubscribeFunc, erro
 	return ch, unsub, nil
 }
 
-func (s *RelayImpl) GetStatistics(string) []*StreamStat {
-	return nil
+func (s *RelayImpl) GetStatistics() []*StreamStatistics {
+	statistics := make([]*StreamStatistics, 0)
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for name, channel := range s.channels {
+		stats := channel.Stats()
+		statistics = append(statistics, &StreamStatistics{
+			Name:    name,
+			Clients: stats.clients,
+			Created: stats.created,
+		})
+	}
+	return statistics
 }

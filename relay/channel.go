@@ -3,6 +3,8 @@ package relay
 import (
 	"log"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type UnsubscribeFunc func()
@@ -11,8 +13,17 @@ type Channel struct {
 	mutex      sync.Mutex
 	subs       Subs
 	buffersize uint
+
+	// statistics
+	clients atomic.Value
+	created time.Time
 }
 type Subs []chan []byte
+
+type Stats struct {
+	clients int
+	created time.Time
+}
 
 // Remove single subscriber
 func (subs Subs) Remove(sub chan []byte) Subs {
@@ -42,6 +53,7 @@ func NewChannel(buffersize uint) *Channel {
 	return &Channel{
 		subs:       make([]chan []byte, 0, 10),
 		buffersize: buffersize,
+		created:    time.Now(),
 	}
 }
 
@@ -52,6 +64,7 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 	channelbuffer := ch.buffersize / 1316
 	sub := make(chan []byte, channelbuffer)
 	ch.subs = append(ch.subs, sub)
+	ch.clients.Store(len(ch.subs))
 
 	var unsub UnsubscribeFunc = func() {
 		ch.mutex.Lock()
@@ -63,6 +76,7 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 		}
 
 		ch.subs = ch.subs.Remove(sub)
+		ch.clients.Store(len(ch.subs))
 	}
 	return sub, unsub
 }
@@ -87,6 +101,7 @@ func (ch *Channel) Pub(b []byte) {
 	for _, sub := range toRemove {
 		ch.subs = ch.subs.Remove(sub)
 	}
+	ch.clients.Store(len(ch.subs))
 }
 
 // Close closes a channel
@@ -97,4 +112,11 @@ func (ch *Channel) Close() {
 		close(ch.subs[i])
 	}
 	ch.subs = nil
+}
+
+func (ch *Channel) Stats() Stats {
+	return Stats{
+		clients: ch.clients.Load().(int),
+		created: ch.created,
+	}
 }

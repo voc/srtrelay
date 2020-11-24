@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/voc/srtrelay/api"
 	"github.com/voc/srtrelay/config"
 	"github.com/voc/srtrelay/relay"
 	"github.com/voc/srtrelay/srt"
@@ -91,7 +92,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Listening on %s:%d\n", conf.App.Address, conf.App.Port)
+
+	if conf.API.Enabled {
+		apiServer := api.NewServer(conf.API, srtServer)
+		err := apiServer.Listen(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("API listening on %s\n", conf.API.Address)
+	}
 
 	// Wait for graceful shutdown
 	<-ctx.Done()
