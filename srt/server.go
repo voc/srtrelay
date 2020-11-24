@@ -1,4 +1,4 @@
-package server
+package srt
 
 // #cgo LDFLAGS: -lsrt
 // #include <srt/srt.h>
@@ -58,12 +58,43 @@ func NewServer(config *Config) Server {
 
 // Listen sets up a SRT socket in listen mode
 func (s *ServerImpl) Listen(ctx context.Context) error {
+	host, portString, err := net.SplitHostPort(s.config.Address)
+	if err != nil {
+		return err
+	}
+
+	if len(host) == 0 {
+		host = "localhost"
+	}
+
+	port, err := strconv.ParseUint(portString, 10, 16)
+	if err != nil {
+		return err
+	}
+
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		return err
+	}
+
+	for _, address := range addrs {
+		err := s.listenAt(ctx, address, uint16(port))
+		if err != nil {
+			return err
+		}
+		log.Printf("SRT Listening on %s:%d\n", address, port)
+	}
+
+	return nil
+}
+
+func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) error {
 	options := make(map[string]string)
 	options["blocking"] = "0"
 	options["transtype"] = "live"
 	options["latency"] = strconv.Itoa(int(s.config.Latency))
 
-	sck := srtgo.NewSrtSocket(s.config.Address, s.config.Port, options)
+	sck := srtgo.NewSrtSocket(host, port, options)
 	err := sck.Listen(1)
 	if err != nil {
 		return fmt.Errorf("Listen failed: %v", err)

@@ -18,7 +18,6 @@ type Config struct {
 
 type AppConfig struct {
 	Address    string
-	Port       uint
 	Latency    uint
 	Buffersize uint
 }
@@ -46,9 +45,7 @@ func Parse(paths []string) (*Config, error) {
 	// set defaults
 	config := Config{
 		App: AppConfig{
-			// TODO: see if we can make IPv6 or even dual socket work
-			Address:    "127.0.0.1",
-			Port:       1337,
+			Address:    "127.0.0.1:1337",
 			Latency:    300,
 			Buffersize: 384000,
 		},

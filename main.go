@@ -12,7 +12,7 @@ import (
 
 	"github.com/voc/srtrelay/config"
 	"github.com/voc/srtrelay/relay"
-	"github.com/voc/srtrelay/server"
+	"github.com/voc/srtrelay/srt"
 )
 
 func handleSignal(ctx context.Context, cancel context.CancelFunc) {
@@ -59,7 +59,6 @@ func main() {
 
 	// actual flags, use config as default and storage
 	flag.StringVar(&conf.App.Address, "address", conf.App.Address, "relay bind address")
-	flag.UintVar(&conf.App.Port, "port", conf.App.Port, "relay port")
 	flag.UintVar(&conf.App.Latency, "latency", conf.App.Latency, "srt protocol latency in ms")
 	flag.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
 		`relay buffer size in bytes, determines maximum delay of a client`)
@@ -70,10 +69,9 @@ func main() {
 		log.Println(err)
 	}
 
-	serverConfig := server.Config{
-		Server: server.ServerConfig{
+	serverConfig := srt.Config{
+		Server: srt.ServerConfig{
 			Address: conf.App.Address,
-			Port:    uint16(conf.App.Port),
 			Latency: conf.App.Latency,
 			Auth:    auth,
 		},
@@ -88,8 +86,8 @@ func main() {
 	defer cancel()
 
 	// create server
-	server := server.NewServer(&serverConfig)
-	err = server.Listen(ctx)
+	srtServer := srt.NewServer(&serverConfig)
+	err = srtServer.Listen(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,9 +1,6 @@
 [app]
 # Relay listen address
-#address =  "127.0.0.1"
-
-# Relay listen port
-#port = 1337
+#address = "127.0.0.1:1337"
 
 # SRT protocol latency in ms
 # This should be a multiple of your expected RTT because SRT needs some time
