@@ -18,9 +18,10 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Address    string
-	Latency    uint
-	Buffersize uint
+	Address     string
+	Latency     uint
+	Buffersize  uint
+	SyncClients bool
 }
 
 type AuthConfig struct {
@@ -52,9 +53,10 @@ func Parse(paths []string) (*Config, error) {
 	// set defaults
 	config := Config{
 		App: AppConfig{
-			Address:    "127.0.0.1:1337",
-			Latency:    300,
-			Buffersize: 384000,
+			Address:     "127.0.0.1:1337",
+			Latency:     300,
+			Buffersize:  384000,
+			SyncClients: false,
 		},
 		Auth: AuthConfig{
 			Type: "static",

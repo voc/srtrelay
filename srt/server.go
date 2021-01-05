@@ -29,10 +29,11 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Address string
-	Port    uint16
-	Latency uint
-	Auth    auth.Authenticator
+	Address     string
+	Port        uint16
+	Latency     uint
+	Auth        auth.Authenticator
+	SyncClients bool
 }
 
 // Server is an interface for a srt relay server
@@ -181,7 +182,7 @@ func (s *ServerImpl) play(conn *srtConn) error {
 	log.Printf("%s - play %s\n", conn.address, conn.streamid.Name())
 
 	demux := format.NewDemuxer()
-	playing := false
+	playing := !s.config.SyncClients
 	for {
 		buf, ok := <-sub
 
@@ -196,8 +197,8 @@ func (s *ServerImpl) play(conn *srtConn) error {
 			return nil
 		}
 
-		// Find synchronization point
-		// TODO: implement timeout for initial sync
+		// Find synchronization pointinitial
+		// TODO: implement timeout for sync
 		if !playing {
 			init, err := demux.FindInit(buf)
 			if err != nil {

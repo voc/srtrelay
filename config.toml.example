@@ -12,6 +12,12 @@
 # Clients which are more than buffersize behind the live edge are disconnected.
 #buffersize = 384000
 
+# Experimental: synchronize MPEG-TS clients to a GOP start
+# This should not increase playback delay, just make sure the client always
+# starts with a clean packet stream and doesn't start buffering.
+# Currently just implemented for H.264 and doesn't really work yet
+#syncClients = false
+
 [api]
 # Set to false to disable the API endpoint
 #enabled = true

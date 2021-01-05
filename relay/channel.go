@@ -40,8 +40,6 @@ func (subs Subs) Remove(sub chan []byte) Subs {
 		return subs
 	}
 
-	log.Println("remove", idx)
-
 	defer close(sub)
 
 	subs[idx] = subs[len(subs)-1] // Copy last element to index i.
