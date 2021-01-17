@@ -5,6 +5,7 @@
 # SRT protocol latency in ms
 # This should be a multiple of your expected RTT because SRT needs some time
 # to send and receive acknowledgements and retransmits to be effective.
+# The recommended latency is about ~2.5x RTT.
 #latency = 300
 
 # Relay buffer size in bytes, 384000 -> 1 second @ 3Mbits

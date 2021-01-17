@@ -27,7 +27,7 @@ const (
 	PayloadHdrMask    = 0x10
 )
 
-// FromBytes creates a packet from a byte slice
+// FromBytes parses a MPEG-TS packet from a byte slice
 func (pkt *Packet) FromBytes(b []byte) error {
 	if len(b) < PacketLen {
 		return io.ErrUnexpectedEOF
@@ -45,8 +45,12 @@ func (pkt *Packet) FromBytes(b []byte) error {
 	// has adaptation field
 	if hdr&AdaptationHdrMask > 0 {
 		afLength := int(b[offset])
-		pkt.AdaptationField = b[offset : offset+afLength+1]
-		offset += afLength + 1
+		if offset+afLength >= PacketLen {
+			return ErrInvalidPacket
+		}
+		offset++
+		pkt.AdaptationField = b[offset : offset+afLength]
+		offset += afLength
 	} else {
 		pkt.AdaptationField = nil
 	}
@@ -68,7 +72,6 @@ func (pkt *Packet) ToBytes(data []byte) error {
 	if len(data) < PacketLen {
 		return io.ErrUnexpectedEOF
 	}
-	data[0] = SyncByte
 
 	// Simplified MPEGTS packet header
 	//   TEI always 0
@@ -76,7 +79,11 @@ func (pkt *Packet) ToBytes(data []byte) error {
 	//   TSC always 0
 	//   Continuity always 0
 	var hdr uint32
+	hdr |= uint32(SyncByte) << 24
 	hdr |= uint32(pkt.PID&0x1fff) << 8
+	if pkt.PUSI {
+		hdr |= 0x1 << 22
+	}
 	if pkt.AdaptationField != nil {
 		hdr |= 0x1 << 5
 	}
@@ -84,14 +91,18 @@ func (pkt *Packet) ToBytes(data []byte) error {
 		hdr |= 0x1 << 4
 	}
 	binary.BigEndian.PutUint32(data[0:4], hdr)
-
 	offset := HeaderLen
-	adaptationFieldLength := len(pkt.AdaptationField)
-	if adaptationFieldLength > PacketLen-offset {
-		return ErrDataTooLong
+
+	if pkt.AdaptationField != nil {
+		adaptationFieldLength := len(pkt.AdaptationField)
+		if adaptationFieldLength > PacketLen-offset-1 {
+			return ErrDataTooLong
+		}
+		data[offset] = byte(adaptationFieldLength)
+		offset++
+		copy(data[offset:offset+adaptationFieldLength], pkt.AdaptationField)
+		offset += adaptationFieldLength
 	}
-	copy(data[offset:offset+adaptationFieldLength], pkt.AdaptationField)
-	offset += adaptationFieldLength
 
 	payloadLength := len(pkt.Payload)
 	if payloadLength > PacketLen-offset {

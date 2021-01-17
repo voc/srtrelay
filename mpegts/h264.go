@@ -2,6 +2,7 @@ package mpegts
 
 import (
 	"bufio"
+	"encoding/hex"
 	"io"
 	"log"
 )
@@ -14,8 +15,9 @@ const (
 
 // AVC NAL unit type constants
 const (
-	NALUnitTypeSPS = 7
-	NALUnitTypePPS = 8
+	NalUnitCodedSliceIDR = 5
+	NALUnitTypeSPS       = 7
+	NALUnitTypePPS       = 8
 )
 
 // H264Parser struct
@@ -55,6 +57,14 @@ func (h *H264Parser) HasInit() bool {
 
 // InitPacket creates a MPEG2-TS PES-Packet containing H.264 SPS and PPS
 func (h *H264Parser) InitPacket() ([]byte, error) {
+	if h.sps[len(h.sps)-1] == 0 {
+		h.sps = h.sps[:len(h.sps)-1]
+	}
+
+	if h.pps[len(h.pps)-1] == 0 {
+		h.pps = h.pps[:len(h.pps)-1]
+	}
+
 	// put SPS and PPS into pes payload
 	pesDataLen := len(h.sps) + len(h.pps)
 	pesData := make([]byte, pesDataLen)
@@ -68,11 +78,10 @@ func (h *H264Parser) InitPacket() ([]byte, error) {
 	}
 
 	// pad with adaptationField
-	adaptationLen := MaxPayloadSize - len(pesPayload)
+	adaptationLen := MaxPayloadSize - len(pesPayload) - 1
 	adaptationField := make([]byte, adaptationLen)
-	adaptationField[0] = 0x3 << 6
-	for i := 0; i < adaptationLen-1; i++ {
-		adaptationField[i+1] = 0xff
+	for i := 1; i < adaptationLen; i++ {
+		adaptationField[i] = 0xff
 	}
 
 	// create MPEG-TS Packet
@@ -88,6 +97,7 @@ func (h *H264Parser) InitPacket() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("init packet:\n", hex.Dump(data))
 	return data, nil
 }
 
@@ -127,18 +137,19 @@ func (h *H264Parser) Parse(rd *io.PipeReader) {
 			}
 
 			// parse nal type
+			nalRefIDC := (nalStart[typeOffset] & 0x60) >> 5
 			nalType := nalStart[typeOffset] & 0x1f
-			// log.Println("NAL", nalType)
+			log.Println("NAL", nalType, nalRefIDC)
 
 			forbiddenZero := nalStart[typeOffset] >> 7 & 1
 			if forbiddenZero != 0 {
-				log.Println("forbidden zero wasn't zero")
 				continue
 			}
 
 			// store previous SPS/PPS
 			switch previousNalType {
 			case NALUnitTypeSPS:
+				log.Println("SPS\n", hex.Dump(nalBuffer))
 				h.sps = nalBuffer
 				nalBuffer = nil
 				if h.sps != nil && h.pps != nil {
@@ -148,6 +159,7 @@ func (h *H264Parser) Parse(rd *io.PipeReader) {
 				}
 
 			case NALUnitTypePPS:
+				log.Println("PPS\n", hex.Dump(nalBuffer))
 				h.pps = nalBuffer
 				nalBuffer = nil
 				if h.sps != nil && h.pps != nil {
