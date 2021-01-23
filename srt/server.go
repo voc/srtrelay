@@ -209,9 +209,8 @@ func (s *ServerImpl) play(conn *srtConn) error {
 					conn.socket.Write(buf, len(buf))
 				}
 				playing = true
-			} else {
-				continue
 			}
+			continue
 		}
 
 		// Write to socket
