@@ -6,7 +6,7 @@
 # This should be a multiple of your expected RTT because SRT needs some time
 # to send and receive acknowledgements and retransmits to be effective.
 # The recommended latency is about ~2.5x RTT.
-#latency = 300
+#latency = 200
 
 # Relay buffer size in bytes, 384000 -> 1 second @ 3Mbits
 # This determines the maximum delay tolerance for connected clients.
@@ -15,8 +15,8 @@
 
 # Experimental: synchronize MPEG-TS clients to a GOP start
 # This should not increase playback delay, just make sure the client always
-# starts with a clean packet stream and doesn't start buffering.
-# Currently just implemented for H.264 and doesn't really work yet
+# starts with a clean packet stream.
+# Currently just implemented for H.264
 #syncClients = false
 
 [api]

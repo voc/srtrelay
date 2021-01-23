@@ -54,7 +54,7 @@ func Parse(paths []string) (*Config, error) {
 	config := Config{
 		App: AppConfig{
 			Address:     "127.0.0.1:1337",
-			Latency:     300,
+			Latency:     200,
 			Buffersize:  384000,
 			SyncClients: false,
 		},
