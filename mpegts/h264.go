@@ -1,240 +1,42 @@
 package mpegts
 
-import (
-	"bufio"
-	"encoding/hex"
-	"io"
-	"log"
-)
-
-// AVC NAL constants
-const (
-	NALStartCode  = 0x00000001 // NAL Start code with single zero byte, required for SPS, PPS and first NAL per picture
-	NALHeaderSize = 4
-)
-
 // AVC NAL unit type constants
 const (
-	NalUnitCodedSliceIDR = 5
+	NALUnitCodedSliceIDR = 5
 	NALUnitTypeSPS       = 7
 	NALUnitTypePPS       = 8
 )
 
-// H264Parser struct
-type H264Parser struct {
-	pid        uint16        // stream PID
-	sps        []byte        // SPS NAL
-	pps        []byte        // PPS NAL
-	initPacket []byte        // packet for init
-	done       chan struct{} // success signal channel
-	semaphor   chan struct{} // semaphor channel
-}
+// H264Parser parser for h.264 init packets
+type H264Parser struct{}
 
-// NewH264Parser creates a new H.264 elementary stream parser
-// Parse can safely be run in a separate goroutine from HasInit and InitPacket
-func NewH264Parser(pid uint16) *H264Parser {
-	semaphor := make(chan struct{}, 1)
-	semaphor <- struct{}{}
-	return &H264Parser{
-		pid:      pid,
-		done:     make(chan struct{}),
-		semaphor: semaphor,
-	}
-}
-
-/**
- * CodecParser Implementation
- */
-// HasInit returns true if the ES has gathered all data required for init
-func (h *H264Parser) HasInit() bool {
-	select {
-	case <-h.done:
-		return true
-	default:
-		return false
-	}
-}
-
-// InitPacket creates a MPEG2-TS PES-Packet containing H.264 SPS and PPS
-func (h *H264Parser) InitPacket() ([]byte, error) {
-	if h.sps[len(h.sps)-1] == 0 {
-		h.sps = h.sps[:len(h.sps)-1]
-	}
-
-	if h.pps[len(h.pps)-1] == 0 {
-		h.pps = h.pps[:len(h.pps)-1]
-	}
-
-	// put SPS and PPS into pes payload
-	pesDataLen := len(h.sps) + len(h.pps)
-	pesData := make([]byte, pesDataLen)
-	copy(pesData[:len(h.sps)], h.sps)
-	copy(pesData[len(h.sps):], h.pps)
-
-	// encode PES payload
-	pesPayload, err := encodeVideoPES(pesData)
-	if err != nil {
-		return nil, err
-	}
-
-	// pad with adaptationField
-	adaptationLen := MaxPayloadSize - len(pesPayload) - 1
-	adaptationField := make([]byte, adaptationLen)
-	for i := 1; i < adaptationLen; i++ {
-		adaptationField[i] = 0xff
-	}
-
-	// create MPEG-TS Packet
-	pkt := Packet{
-		PID:             h.pid,
-		PUSI:            true,
-		Payload:         pesPayload,
-		AdaptationField: adaptationField,
-	}
-
-	data := make([]byte, PacketLen)
-	err = pkt.ToBytes(data)
-	if err != nil {
-		return nil, err
-	}
-	log.Println("init packet:\n", hex.Dump(data))
-	return data, nil
-}
-
-// Parse reads H.264 PPS and SPS from PES payloads
-func (h *H264Parser) Parse(rd *io.PipeReader) {
-	// get semaphor
-	<-h.semaphor
-	defer func() { h.semaphor <- struct{}{} }()
-
-	// Don't read after success
-	if h.HasInit() {
-		rd.Close()
-		return
-	}
-
-	var previousNalType byte
-	var nalBuffer []byte
-	skippedZero := false
-
-	// buffered reader for reading cross-packet data
-	brd := bufio.NewReaderSize(rd, MaxPayloadSize)
-
-	for {
-		// Peek start of potential NAL packet
-		nalStart, err := brd.Peek(NALHeaderSize)
-		if err != nil {
-			break
-		}
-
-		// Check starting bytes
-		if nalStart[0] == 0x0 && nalStart[1] == 0x0 && nalStart[2] == 0x1 ||
-			skippedZero && nalStart[0] == 0x0 && nalStart[1] == 0x1 {
-
-			typeOffset := 3
-			if skippedZero {
-				typeOffset = 2
-			}
-
-			// parse nal type
-			nalRefIDC := (nalStart[typeOffset] & 0x60) >> 5
-			nalType := nalStart[typeOffset] & 0x1f
-			log.Println("NAL", nalType, nalRefIDC)
-
-			forbiddenZero := nalStart[typeOffset] >> 7 & 1
-			if forbiddenZero != 0 {
-				continue
-			}
-
-			// store previous SPS/PPS
-			switch previousNalType {
+// ContainsInit checks whether the MPEG-TS packet contains a h.264 PPS or SPS
+func (p H264Parser) ContainsInit(pkt *Packet) (bool, error) {
+	var state byte
+	buf := pkt.Payload()
+	for i := 0; i < len(buf); i++ {
+		if state == 0x57 {
+			nalType := buf[i] & 0x1F
+			switch nalType {
 			case NALUnitTypeSPS:
-				log.Println("SPS\n", hex.Dump(nalBuffer))
-				h.sps = nalBuffer
-				nalBuffer = nil
-				if h.sps != nil && h.pps != nil {
-					close(h.done)
-					rd.Close()
-					return
-				}
-
+				fallthrough
 			case NALUnitTypePPS:
-				log.Println("PPS\n", hex.Dump(nalBuffer))
-				h.pps = nalBuffer
-				nalBuffer = nil
-				if h.sps != nil && h.pps != nil {
-					close(h.done)
-					rd.Close()
-					return
-				}
+				return true, nil
 			}
-
-			// log.Printf("nal, offset: %x, unit type: %x\n", offset, nalType)
-			if nalType == NALUnitTypeSPS || nalType == NALUnitTypePPS {
-				// log.Println("got SPS/PPS")
-				nalBuffer = make([]byte, 0, 200)
-				nalBuffer = append(nalBuffer, 0x0)
-
-				if skippedZero {
-					nalBuffer = append(nalBuffer, 0x0)
-				}
-
-				// ignore error, because the bytes should be buffered through peek
-				startSlice := make([]byte, NALHeaderSize)
-				n, _ := brd.Read(startSlice)
-				if n < NALHeaderSize {
-					log.Fatal("Short read, should be buffered")
-					return
-				}
-				nalBuffer = append(nalBuffer, startSlice...)
-			}
-			previousNalType = nalType
 		}
 
-		// Read until next zero byte
-		skippedZero = false
-		buf, err := brd.ReadSlice(0x0)
-		if nalBuffer != nil {
-			// may append an extra zero byte at the end of the NAL
-			// which is okay
-			nalBuffer = append(nalBuffer, buf...)
+		cur := 0
+		if buf[i] == 0x00 {
+			cur = 1
+		} else if buf[i] == 0x01 {
+			cur = 3
+		} else {
+			cur = 2
 		}
-
-		// brd buffer full, continue parsing
-		if err == bufio.ErrBufferFull {
-			continue
-		}
-
-		if err != nil {
-			break
-		}
-
-		// err is nil so we skipped a zero byte
-		skippedZero = true
+		/* state of last four bytes packed into one byte; two bits for unseen/zero/over
+		 * one/one (0..3 respectively).
+		 */
+		state = (state << 2) | byte(cur)
 	}
-
-	// read remaining bytes
-	buffered := brd.Buffered()
-	if buffered > 0 {
-		tmp := make([]byte, buffered)
-		n, _ := brd.Read(tmp)
-		nalBuffer = append(nalBuffer, tmp[:n]...)
-	}
-
-	// store previous SPS/PPS
-	// assumes last nal continues until the end
-	switch previousNalType {
-	case NALUnitTypeSPS:
-		h.sps = nalBuffer
-	case NALUnitTypePPS:
-		h.pps = nalBuffer
-	}
-
-	if h.sps != nil && h.pps != nil {
-		close(h.done)
-	}
-	rd.Close()
-
-	// Parse PTS
-	// log.Printf("got ES start, stream id: %x, length: %d, pid: %d\n", streamID, packetLength, pid)
+	return false, nil
 }

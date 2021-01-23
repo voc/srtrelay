@@ -7,10 +7,9 @@ import (
 
 // Packet represents a MPEGTS packet
 type Packet struct {
-	PID             uint16 // Payload ID
-	PUSI            bool   // Payload Unit Start Indicator
-	Payload         []byte
-	AdaptationField []byte
+	header          uint32
+	payload         []byte
+	adaptationField []byte
 }
 
 // MPEGTS Packet constants
@@ -25,8 +24,12 @@ const (
 	PIDHdrMask        = 0x1fff00
 	AdaptationHdrMask = 0x20
 	PayloadHdrMask    = 0x10
+	ContinuityHdrMask = 0xf
 )
 
+/**
+ * Packet Parsing
+ */
 // FromBytes parses a MPEG-TS packet from a byte slice
 func (pkt *Packet) FromBytes(b []byte) error {
 	if len(b) < PacketLen {
@@ -37,32 +40,85 @@ func (pkt *Packet) FromBytes(b []byte) error {
 		return ErrInvalidPacket
 	}
 
-	hdr := binary.BigEndian.Uint32(b[0:HeaderLen])
-	pkt.PID = uint16(hdr & PIDHdrMask >> PIDOffset)
-	pkt.PUSI = hdr&PUSIHdrMask > 0
+	pkt.header = binary.BigEndian.Uint32(b[0:HeaderLen])
 	offset := HeaderLen
 
 	// has adaptation field
-	if hdr&AdaptationHdrMask > 0 {
+	if pkt.header&AdaptationHdrMask > 0 {
 		afLength := int(b[offset])
 		if offset+afLength >= PacketLen {
 			return ErrInvalidPacket
 		}
 		offset++
-		pkt.AdaptationField = b[offset : offset+afLength]
+		pkt.adaptationField = b[offset : offset+afLength]
 		offset += afLength
 	} else {
-		pkt.AdaptationField = nil
+		pkt.adaptationField = nil
 	}
 
 	// has payload
-	if hdr&PayloadHdrMask > 0 {
-		pkt.Payload = b[offset:PacketLen]
+	if pkt.header&PayloadHdrMask > 0 {
+		pkt.payload = b[offset:PacketLen]
 	} else {
-		pkt.Payload = nil
+		pkt.payload = nil
 	}
 
 	return nil
+}
+
+// PID Payload ID
+func (pkt *Packet) PID() uint16 {
+	return uint16(pkt.header & PIDHdrMask >> PIDOffset)
+}
+
+// Continuity sequence number of payload packets
+func (pkt *Packet) Continuity() byte {
+	return byte(pkt.header & ContinuityHdrMask)
+}
+
+// PUSI the Payload Unit Start Indicator
+func (pkt *Packet) PUSI() bool {
+	return pkt.header&PUSIHdrMask > 0
+}
+
+func (pkt *Packet) Payload() []byte {
+	return pkt.payload
+}
+
+func (pkt *Packet) AdaptationField() []byte {
+	return pkt.adaptationField
+}
+
+/**
+ * Packet creation
+ */
+// CreatePacket returns a bare MPEG-TS Packet
+func CreatePacket(pid uint16) *Packet {
+	var header uint32
+	header |= uint32(SyncByte) << 24
+	header |= uint32(pid&0x1fff) << 8
+	return &Packet{
+		header:          header,
+		payload:         nil,
+		adaptationField: nil,
+	}
+}
+
+func (pkt *Packet) WithPUSI(pusi bool) *Packet {
+	if pusi {
+		pkt.header |= 0x1 << 22
+	}
+	return pkt
+}
+
+func (pkt *Packet) WithPayload(payload []byte) *Packet {
+	pkt.payload = payload
+	return pkt
+}
+
+func (pkt *Packet) WithAdaptationField(adaptationField []byte) *Packet {
+	pkt.adaptationField = adaptationField
+	return pkt
 }
 
 // ToBytes encodes a valid MPEGTS packet into a byte slice
@@ -78,37 +134,31 @@ func (pkt *Packet) ToBytes(data []byte) error {
 	//   Transport priority always 0
 	//   TSC always 0
 	//   Continuity always 0
-	var hdr uint32
-	hdr |= uint32(SyncByte) << 24
-	hdr |= uint32(pkt.PID&0x1fff) << 8
-	if pkt.PUSI {
-		hdr |= 0x1 << 22
+	if pkt.AdaptationField() != nil {
+		pkt.header |= 0x1 << 5
 	}
-	if pkt.AdaptationField != nil {
-		hdr |= 0x1 << 5
+	if pkt.Payload() != nil {
+		pkt.header |= 0x1 << 4
 	}
-	if pkt.Payload != nil {
-		hdr |= 0x1 << 4
-	}
-	binary.BigEndian.PutUint32(data[0:4], hdr)
+	binary.BigEndian.PutUint32(data[0:4], pkt.header)
 	offset := HeaderLen
 
-	if pkt.AdaptationField != nil {
-		adaptationFieldLength := len(pkt.AdaptationField)
+	if pkt.AdaptationField() != nil {
+		adaptationFieldLength := len(pkt.adaptationField)
 		if adaptationFieldLength > PacketLen-offset-1 {
 			return ErrDataTooLong
 		}
 		data[offset] = byte(adaptationFieldLength)
 		offset++
-		copy(data[offset:offset+adaptationFieldLength], pkt.AdaptationField)
+		copy(data[offset:offset+adaptationFieldLength], pkt.adaptationField)
 		offset += adaptationFieldLength
 	}
 
-	payloadLength := len(pkt.Payload)
+	payloadLength := len(pkt.payload)
 	if payloadLength > PacketLen-offset {
 		return ErrDataTooLong
 	}
-	copy(data[offset:offset+payloadLength], pkt.Payload)
+	copy(data[offset:offset+payloadLength], pkt.payload)
 	offset += payloadLength
 
 	return nil

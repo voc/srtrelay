@@ -53,8 +53,6 @@ func ParsePSIHeader(data []byte) (*PSIHeader, error) {
 
 	hdr.sectionNumber = data[6]
 	hdr.lastSectionNumber = data[7]
-	// log.Println("PSI: tableID", hdr.tableID, "sectionLength", hdr.sectionLength, "version", hdr.versionNumber,
-	// "currentNext", hdr.currentNext, "sectionNumber", hdr.sectionNumber, "lastSectionNumber", hdr.lastSectionNumber)
 
 	return &hdr, nil
 }

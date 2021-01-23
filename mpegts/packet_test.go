@@ -18,12 +18,10 @@ func TestPacket_ToBytes_FromBytes(t *testing.T) {
 	}
 
 	// encode packet
-	pkt1 := Packet{
-		PID:             0x100,
-		Payload:         payload,
-		AdaptationField: adaptationField,
-		PUSI:            true,
-	}
+	pkt1 := CreatePacket(0x100).
+		WithPayload(payload).
+		WithAdaptationField(adaptationField).
+		WithPUSI(true)
 	err := pkt1.ToBytes(buf)
 	if err != nil {
 		t.Fatal(err)
@@ -36,23 +34,23 @@ func TestPacket_ToBytes_FromBytes(t *testing.T) {
 		t.Fatal(err, hex.Dump(buf))
 	}
 
-	if pkt1.PID != pkt2.PID {
-		t.Errorf("Failed to encode/parse PID, got: %d, expected: %d", pkt2.PID, pkt1.PID)
+	if pkt1.PID() != pkt2.PID() {
+		t.Errorf("Failed to encode/parse PID, got: %d, expected: %d", pkt2.PID(), pkt1.PID())
 	}
 
-	if pkt1.PUSI != pkt2.PUSI {
-		t.Errorf("Failed to encode/parse PUSI, got: %v, expected: %v", pkt2.PUSI, pkt1.PUSI)
+	if pkt1.PUSI() != pkt2.PUSI() {
+		t.Errorf("Failed to encode/parse PUSI, got: %v, expected: %v", pkt2.PUSI(), pkt1.PUSI())
 	}
 
-	if hex.EncodeToString(pkt1.Payload) != hex.EncodeToString(pkt2.Payload) {
+	if hex.EncodeToString(pkt1.Payload()) != hex.EncodeToString(pkt2.Payload()) {
 		t.Errorf("Failed to encode/parse Payload,\n got: %s,\n expected %s",
-			hex.EncodeToString(pkt2.Payload),
-			hex.EncodeToString(pkt1.Payload))
+			hex.EncodeToString(pkt2.Payload()),
+			hex.EncodeToString(pkt1.Payload()))
 	}
 
-	if hex.EncodeToString(pkt1.AdaptationField) != hex.EncodeToString(pkt2.AdaptationField) {
+	if hex.EncodeToString(pkt1.AdaptationField()) != hex.EncodeToString(pkt2.AdaptationField()) {
 		t.Errorf("Failed to encode/parse AdaptationField,\n got: %s,\n expected %s",
-			hex.EncodeToString(pkt2.AdaptationField),
-			hex.EncodeToString(pkt1.AdaptationField))
+			hex.EncodeToString(pkt2.AdaptationField()),
+			hex.EncodeToString(pkt1.AdaptationField()))
 	}
 }

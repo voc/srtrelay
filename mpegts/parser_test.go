@@ -23,7 +23,7 @@ type ffprobeOutput struct {
 }
 
 func ffprobe(filename string) (ffprobeOutput, error) {
-	cmd := exec.Command("ffprobe", "-hide_banner", "-of", "json", "-show_frames", filename)
+	cmd := exec.Command("ffprobe", "-v", "debug", "-hide_banner", "-of", "json", "-show_frames", filename)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
@@ -42,7 +42,7 @@ func ffprobe(filename string) (ffprobeOutput, error) {
 			if err != nil {
 				break
 			}
-			log.Printf("%s\n", buf[:res])
+			log.Printf("%s", buf[:res])
 		}
 	}()
 	var output ffprobeOutput
@@ -55,39 +55,29 @@ func ffprobe(filename string) (ffprobeOutput, error) {
 	return output, err
 }
 
-func TestParser_ParseH264_basic(t *testing.T) {
-	// Parse 1s complete MPEG-TS with NAL at start
-	data, err := ioutil.ReadFile("h264.ts")
-	if err != nil {
-		t.Fatal("failed to open test file")
-	}
-	p := NewParser()
+func checkParser(t *testing.T, p *Parser, data []byte, name string, numFrames int) {
 	numPackets := len(data) / PacketLen
 	offset := 0
 	for i := 0; i < numPackets; i++ {
 		packet := data[i*PacketLen : (i+1)*PacketLen]
 		offset = (i + 1) * PacketLen
-		err = p.Parse(packet)
+		err := p.Parse(packet)
 		if err != nil {
-			t.Fatalf("Parse failed: %v", err)
+			t.Fatalf("%s - Parse failed: %v", name, err)
 		}
 		if p.hasInit() {
 			break
 		}
 	}
 	if !p.hasInit() {
-		t.Error("Should find init")
+		t.Errorf("%s - Should find init", name)
 	}
 	pkts, err := p.InitData()
 	if err != nil {
-		t.Fatalf("Init data failed: %v", err)
+		t.Fatalf("%s - Init data failed: %v", name, err)
 	}
 	if pkts == nil {
-		t.Error("Init should not be nil")
-	}
-	initCount := len(pkts)
-	if initCount != 4 {
-		t.Errorf("Expected 4 init packets, got %d", initCount)
+		t.Errorf("%s - Init should not be nil", name)
 	}
 
 	file, err := ioutil.TempFile("", "srttest")
@@ -104,13 +94,42 @@ func TestParser_ParseH264_basic(t *testing.T) {
 	file.Sync()
 
 	// compare ffprobe results with original
-	wanted, err := ffprobe("h264.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
 	got, err := ffprobe(file.Name())
 	log.Println(got, err)
-	if len(wanted.Frames) != len(got.Frames) {
-		t.Errorf("Wrong number of frames")
+	if numFrames != len(got.Frames) {
+		t.Errorf("%s - Failed ffprobe, got %d frames, expected %d", name, len(got.Frames), numFrames)
+	}
+}
+
+func TestParser_ParseH264_basic(t *testing.T) {
+	// Parse 1s complete MPEG-TS with NAL at start
+	data, err := ioutil.ReadFile("h264.ts")
+	if err != nil {
+		t.Fatalf("failed to open test file")
+	}
+	p := NewParser()
+	checkParser(t, p, data, "simple", 25)
+}
+
+func TestParser_ParseH264_complex(t *testing.T) {
+	// Parse 1s complete MPEG-TS with NAL at start
+	data, err := ioutil.ReadFile("h264_long.ts")
+	if err != nil {
+		t.Fatalf("failed to open test file")
+	}
+	log.Println("numpackets", len(data)/PacketLen)
+
+	tests := []struct {
+		name           string
+		offset         int
+		expectedFrames int
+	}{
+		{"NoOffset", 0, 15},
+		{"GOPOffset", 50 * PacketLen, 10},
+		{"2GOPOffset", 100 * PacketLen, 5},
+	}
+	for _, tt := range tests {
+		p := NewParser()
+		checkParser(t, p, data[tt.offset:], tt.name, tt.expectedFrames)
 	}
 }

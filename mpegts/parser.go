@@ -33,9 +33,11 @@ const (
 //   3. Parse PES to find H.264 SPS+PPS or equivalent
 // Store the original packets or generate new ones to send to a client
 type Parser struct {
-	init               [][]byte                     // collected packets to initialize a decoder
-	expectedPATSection byte                         // id of next expected PAT section
-	expectedPMTSection byte                         // id of next expected PMT sectino
+	init               [][]byte // collected packets to initialize a decoder
+	expectedPATSection byte     // id of next expected PAT section
+	expectedPMTSection byte     // id of next expected PMT section
+	PAT                []byte
+	PMT                []byte
 	hasPAT             bool                         // MPEG-TS PAT packet stored
 	hasPMT             bool                         // MPEG-TS PMT packet stored
 	pmtMap             map[uint16]uint16            // map[pid]programNumber
@@ -55,8 +57,8 @@ func (p *Parser) hasInit() bool {
 		return false
 	}
 
-	for _, stream := range p.tspMap {
-		if !stream.parser.HasInit() {
+	for _, es := range p.tspMap {
+		if !es.HasInit {
 			return false
 		}
 	}
@@ -70,16 +72,10 @@ func (p *Parser) InitData() ([][]byte, error) {
 		return nil, nil
 	}
 
-	// add stream init packets
-	for _, stream := range p.tspMap {
-		packet, err := stream.parser.InitPacket()
-		if err != nil {
-			return nil, err
-		}
-		p.init = append(p.init, packet)
-	}
+	init := [][]byte{p.PAT, p.PMT}
+	init = append(init, p.init...)
 
-	return p.init, nil
+	return init, nil
 }
 
 // Parse processes all MPEGTS packets from a buffer
@@ -100,26 +96,35 @@ func (p *Parser) Parse(data []byte) error {
 		}
 
 		storePacket := false
-		if pkt.PID == PIDPAT {
+		if pkt.PID() == PIDPAT {
 			// parse PMT and store PAT packet
-			storePacket, err = p.ParsePSI(pkt.Payload)
+			store, err := p.ParsePSI(pkt.Payload())
 			if err != nil {
 				return err
 			}
+			if store {
+				p.PAT = data[:pkt.Size()]
+			}
 
-		} else if _, ok := p.pmtMap[pkt.PID]; ok {
+		} else if _, ok := p.pmtMap[pkt.PID()]; ok {
 			// Parse PID->ES mapping and store PMT packet
-			storePacket, err = p.ParsePSI(pkt.Payload)
+			store, err := p.ParsePSI(pkt.Payload())
 			if err != nil {
 				return err
 			}
+			if store {
+				p.PMT = data[:pkt.Size()]
+			}
 
-		} else if stream, ok := p.tspMap[pkt.PID]; ok {
+		} else if stream, ok := p.tspMap[pkt.PID()]; ok {
 			// Parse PES and store SPS+PPS packet
 			// log.Println("payload", len(pkt.Payload), len(pkt.AdaptationField))
-			err = stream.ParsePES(&pkt)
+			storePacket, err = stream.CodecParser.ContainsInit(&pkt)
 			if err != nil {
 				return err
+			}
+			if storePacket {
+				stream.HasInit = true
 			}
 		}
 
@@ -171,6 +176,7 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 		p.expectedPATSection = hdr.sectionNumber + 1
 		if hdr.sectionNumber == hdr.lastSectionNumber {
 			p.hasPAT = true
+			p.expectedPATSection = 0
 		}
 
 	case TableTypePMT:
@@ -196,11 +202,13 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 			esInfoLength := binary.BigEndian.Uint16(data[offset:offset+2]) & 0xfff
 			offset += 2 + int(esInfoLength)
 
-			switch streamType {
-			case StreamTypeH264:
-				log.Println("setup parser", elementaryPID)
-				p.tspMap[elementaryPID] = &ElementaryStream{
-					parser: NewH264Parser(elementaryPID),
+			_, hasParser := p.tspMap[elementaryPID]
+			if !hasParser {
+				switch streamType {
+				case StreamTypeH264:
+					p.tspMap[elementaryPID] = &ElementaryStream{CodecParser: H264Parser{}}
+				default:
+					log.Println("Unknown streamtype", elementaryPID)
 				}
 			}
 
@@ -213,6 +221,7 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 		p.expectedPMTSection = hdr.sectionNumber + 1
 		if hdr.sectionNumber == hdr.lastSectionNumber {
 			p.hasPMT = true
+			p.expectedPMTSection = 0
 		}
 	}
 	return shouldStore, nil
