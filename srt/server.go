@@ -249,5 +249,9 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 }
 
 func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
-	return s.relay.GetStatistics()
+	streams := s.relay.GetStatistics()
+	for _, stream := range streams {
+		stream.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.Address, stream.Name)
+	}
+	return streams
 }

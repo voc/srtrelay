@@ -24,6 +24,7 @@ type Relay interface {
 
 type StreamStatistics struct {
 	Name    string    `json:"name"`
+	URL     string    `json:"url"`
 	Clients int       `json:"clients"`
 	Created time.Time `json:"created"`
 }
