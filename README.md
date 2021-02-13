@@ -1,14 +1,17 @@
-# srtrelay
+# srtrelay ![CI](https://github.com/voc/srtrelay/workflows/CI/badge.svg)
 Streaming-Relay for the SRT-protocol
 
 Use at your own risk
 
 ## Dependencies
-**Ubuntu**
-  - apt install libsrt1
+Requires libsrt-1.4.2
 
-**Debian 11**:
-  - apt install libsrt1-openssl
+**Ubuntu**
+  - you will need to [build libsrt yourself](https://github.com/Haivision/srt#build-on-linux)
+
+**Debian 10**:
+  - use libsrt-openssl-dev from the [voc repository](https://c3voc.de/wiki/projects:vocbian)
+  - or [build it yourself](https://github.com/Haivision/srt#build-on-linux)
 
 **Gentoo**:
   - emerge net-libs/srt
