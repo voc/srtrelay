@@ -4,7 +4,10 @@ Streaming-Relay for the SRT-protocol
 Use at your own risk
 
 ## Dependencies
-**Debian 10**:
+**Ubuntu**
+  - apt install libsrt1
+
+**Debian 11**:
   - apt install libsrt1-openssl
 
 **Gentoo**:
@@ -41,17 +44,8 @@ The configuration file can be placed under *config.toml* in the current working 
 ### API
 See [docs/API.md](docs/API.md) for more information about the API.
 
-## Design Ideas
-  - Just a 1:n multiplexer, one publisher (push) to multiple subscribers (pull)
-  - No decoding -> use ffmpeg instead
-  - No remuxing -> use ffmpeg instead
-  - Allow any data to be relayed, not just MPEG-TS
-
-## Develop
-Run tests
-```
-go test ./...
-```
+## Contributing
+See [docts/Contributing.md](docs/Contributing.md)
 
 ## Credits
 Thanks go to
