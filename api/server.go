@@ -40,7 +40,8 @@ func (s *Server) Listen(ctx context.Context) error {
 	}()
 	go func() {
 		<-ctx.Done()
-		ctx2, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx2, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
 		serv.Shutdown(ctx2)
 	}()
 
