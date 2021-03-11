@@ -60,6 +60,7 @@ func NewServer(config *Config) Server {
 	return &ServerImpl{
 		relay:  r,
 		config: &config.Server,
+		conns:  make(map[*srtConn]bool),
 	}
 }
 
@@ -165,6 +166,8 @@ func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *ne
 		address:  addr,
 		streamid: &streamid,
 	}
+
+	s.registerForStats(ctx, conn)
 
 	switch streamid.Mode() {
 	case stream.ModePlay:
