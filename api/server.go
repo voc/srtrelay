@@ -27,6 +27,7 @@ func NewServer(conf config.APIConfig, srtServer srt.Server) *Server {
 func (s *Server) Listen(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/streams", s.HandleStreams)
+	mux.HandleFunc("/sockets", s.HandleSockets)
 	serv := &http.Server{
 		Addr:           s.conf.Address,
 		Handler:        mux,
@@ -51,5 +52,11 @@ func (s *Server) Listen(ctx context.Context) error {
 func (s *Server) HandleStreams(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	stats := s.srtServer.GetStatistics()
+	json.NewEncoder(w).Encode(stats)
+}
+
+func (s *Server) HandleSockets(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	stats := s.srtServer.GetSocketStatistics()
 	json.NewEncoder(w).Encode(stats)
 }

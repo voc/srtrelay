@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 
 	"github.com/haivision/srtgo"
 	"github.com/voc/srtrelay/auth"
@@ -39,14 +40,18 @@ type ServerConfig struct {
 // Server is an interface for a srt relay server
 type Server interface {
 	Listen(context.Context) error
-	Handle(*srtgo.SrtSocket, *net.UDPAddr)
+	Handle(context.Context, *srtgo.SrtSocket, *net.UDPAddr)
 	GetStatistics() []*relay.StreamStatistics
+	GetSocketStatistics() []*SocketStatistics
 }
 
 // ServerImpl implements the Server interface
 type ServerImpl struct {
 	config *ServerConfig
 	relay  relay.Relay
+
+	mutex sync.Mutex
+	conns map[*srtConn]bool
 }
 
 // NewServer creates a server
@@ -119,7 +124,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 				}
 				log.Fatalln("accept failed", err)
 			}
-			go s.Handle(sock, addr)
+			go s.Handle(ctx, sock, addr)
 		}
 	}()
 	return nil
@@ -133,7 +138,7 @@ type srtConn struct {
 }
 
 // Handle srt client connection
-func (s *ServerImpl) Handle(sock *srtgo.SrtSocket, addr *net.UDPAddr) {
+func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *net.UDPAddr) {
 	var streamid stream.StreamID
 	defer sock.Close()
 
@@ -248,10 +253,53 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 	}
 }
 
+func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
+	go func() {
+		<-ctx.Done()
+
+		s.mutex.Lock()
+		defer s.mutex.Unlock()
+
+		delete(s.conns, conn)
+	}()
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.conns[conn] = true
+}
+
 func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
 	streams := s.relay.GetStatistics()
 	for _, stream := range streams {
 		stream.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.Address, stream.Name)
 	}
 	return streams
+}
+
+type SocketStatistics struct {
+	Address  string          `json:"address"`
+	StreamID string          `json:"stream_id"`
+	Stats    *srtgo.SrtStats `json:"stats"`
+}
+
+func (s *ServerImpl) GetSocketStatistics() []*SocketStatistics {
+	statistics := make([]*SocketStatistics, 0)
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for conn := range s.conns {
+		srtStats, err := conn.socket.Stats()
+		if err != nil {
+			continue
+		}
+		statistics = append(statistics, &SocketStatistics{
+			Address:  conn.address.String(),
+			StreamID: conn.streamid.String(),
+			Stats:    srtStats,
+		})
+	}
+
+	return statistics
 }
