@@ -257,6 +257,11 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 }
 
 func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.conns[conn] = true
+
 	go func() {
 		<-ctx.Done()
 
@@ -265,11 +270,6 @@ func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
 
 		delete(s.conns, conn)
 	}()
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.conns[conn] = true
 }
 
 func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
