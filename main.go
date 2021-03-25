@@ -74,6 +74,7 @@ func main() {
 		Server: srt.ServerConfig{
 			Address:     conf.App.Address,
 			Latency:     conf.App.Latency,
+			LossMaxTTL:  conf.App.LossMaxTTL,
 			SyncClients: conf.App.SyncClients,
 			Auth:        auth,
 		},

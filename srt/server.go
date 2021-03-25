@@ -33,6 +33,7 @@ type ServerConfig struct {
 	Address     string
 	Port        uint16
 	Latency     uint
+	LossMaxTTL  uint
 	Auth        auth.Authenticator
 	SyncClients bool
 }
@@ -103,6 +104,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 	options["latency"] = strconv.Itoa(int(s.config.Latency))
 
 	sck := srtgo.NewSrtSocket(host, port, options)
+	sck.SetSockOptInt(C.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL))
 	err := sck.Listen(1)
 	if err != nil {
 		return fmt.Errorf("Listen failed: %v", err)
