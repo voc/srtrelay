@@ -22,6 +22,7 @@ type AppConfig struct {
 	Latency     uint
 	Buffersize  uint
 	SyncClients bool
+	LossMaxTTL  uint
 }
 
 type AuthConfig struct {
@@ -55,6 +56,7 @@ func Parse(paths []string) (*Config, error) {
 		App: AppConfig{
 			Address:     "127.0.0.1:1337",
 			Latency:     200,
+			LossMaxTTL:  0,
 			Buffersize:  384000,
 			SyncClients: false,
 		},
