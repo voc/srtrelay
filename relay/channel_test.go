@@ -78,3 +78,20 @@ func TestChannel_Close(t *testing.T) {
 		t.Error("Subscriber channel should be closed after Close")
 	}
 }
+
+func TestChannel_Stats(t *testing.T) {
+	ch := NewChannel(0)
+	if num := ch.Stats().clients; num != 0 {
+		t.Errorf("Expected 0 clients after create, got %d", num)
+	}
+
+	_, unsubscribe := ch.Sub()
+	if num := ch.Stats().clients; num != 1 {
+		t.Errorf("Expected 1 clients after subscribe, got %d", num)
+	}
+
+	unsubscribe()
+	if num := ch.Stats().clients; num != 0 {
+		t.Errorf("Expected 0 clients after unsubscribe, got %d", num)
+	}
+}

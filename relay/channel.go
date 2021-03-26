@@ -48,11 +48,13 @@ func (subs Subs) Remove(sub chan []byte) Subs {
 }
 
 func NewChannel(buffersize uint) *Channel {
-	return &Channel{
+	ch := &Channel{
 		subs:       make([]chan []byte, 0, 10),
 		buffersize: buffersize,
 		created:    time.Now(),
 	}
+	ch.clients.Store(0)
+	return ch
 }
 
 // Sub subscribes to a channel
