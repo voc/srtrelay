@@ -1,0 +1,14 @@
+Source: srtrelay
+Section: video
+Priority: optional
+Maintainer: derchris <derchris@me.com>
+Build-Depends: debhelper (>=10), pkgconf, ssl-cert, ca-certificates, tar, wget, curl, git, golang, libsrt-openssl-dev
+Standards-Version: 4.50
+Homepage: https://github.com/voc/srtrelay
+
+Package: srtrelay
+Priority: extra
+Architecture: any
+Depends: ${shlibs:Depends}, libsrt-openssl
+Description: srtrelay
+ Streaming-Relay for the SRT-protocol
