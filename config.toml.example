@@ -1,6 +1,9 @@
 [app]
 # Relay listen address
-#address = "127.0.0.1:1337"
+# You can add multiple addresses to listen on. If you use a domain name, it will be resolved to its IP-Addresses.
+# The first address listed here will be used to generate the listen-URL you can request by the API.
+# However, you can use whatever address you specified here to listen to a stream. Or just reorder the list.
+addresses = ["localhost:1337" ]
 
 # SRT protocol latency in ms
 # This should be a multiple of your expected RTT because SRT needs some time

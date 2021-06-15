@@ -18,7 +18,7 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Address     string
+	Addresses   []string
 	Latency     uint
 	Buffersize  uint
 	SyncClients bool
@@ -54,7 +54,7 @@ func Parse(paths []string) (*Config, error) {
 	// set defaults
 	config := Config{
 		App: AppConfig{
-			Address:     "127.0.0.1:1337",
+			Addresses:   []string{"localhost:1337"},
 			Latency:     200,
 			LossMaxTTL:  0,
 			Buffersize:  384000,
