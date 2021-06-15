@@ -30,8 +30,7 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Address     string
-	Port        uint16
+	Addresses   []string
 	Latency     uint
 	LossMaxTTL  uint
 	Auth        auth.Authenticator
@@ -69,31 +68,34 @@ func NewServer(config *Config) Server {
 
 // Listen sets up a SRT socket in listen mode
 func (s *ServerImpl) Listen(ctx context.Context) error {
-	host, portString, err := net.SplitHostPort(s.config.Address)
-	if err != nil {
-		return err
-	}
-
-	if len(host) == 0 {
-		host = "localhost"
-	}
-
-	port, err := strconv.ParseUint(portString, 10, 16)
-	if err != nil {
-		return err
-	}
-
-	addrs, err := net.LookupHost(host)
-	if err != nil {
-		return err
-	}
-
-	for _, address := range addrs {
-		err := s.listenAt(ctx, address, uint16(port))
+	for _, address := range s.config.Addresses {
+		host, portString, err := net.SplitHostPort(address)
 		if err != nil {
 			return err
 		}
-		log.Printf("SRT Listening on %s:%d\n", address, port)
+		if len(host) == 0 {
+		}
+		port, err := strconv.ParseUint(portString, 10, 16)
+		if err != nil {
+			return err
+		}
+		var addrs []string
+		if len(host) != 0 {
+			addrs, err = net.LookupHost(host)
+			if err != nil {
+				return err
+			}
+		} else {
+			addrs = []string{"0.0.0.0", "[::]"}
+		}
+
+		for _, address := range addrs {
+			err := s.listenAt(ctx, address, uint16(port))
+			if err != nil {
+				return err
+			}
+			log.Printf("SRT Listening on %s:%d\n", address, port)
+		}
 	}
 
 	return nil
@@ -134,7 +136,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 	sck.SetListenCallback(s.listenCallback)
 	err := sck.Listen(5)
 	if err != nil {
-		return fmt.Errorf("Listen failed: %v", err)
+		return fmt.Errorf("Listen failed for %v:%v : %v", host, port, err)
 	}
 
 	s.done.Add(1)
@@ -302,7 +304,7 @@ func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
 func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
 	streams := s.relay.GetStatistics()
 	for _, stream := range streams {
-		stream.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.Address, stream.Name)
+		stream.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.Addresses[0], stream.Name)
 	}
 	return streams
 }

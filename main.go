@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/haivision/srtgo"
@@ -59,11 +60,14 @@ func main() {
 	flag.String("config", "config.toml", "path to config file")
 
 	// actual flags, use config as default and storage
-	flag.StringVar(&conf.App.Address, "address", conf.App.Address, "relay bind address")
+	var addresses string
+	flag.StringVar(&addresses, "addresses", strings.Join(conf.App.Addresses, ","), "relay bind addresses, seperated by commata")
 	flag.UintVar(&conf.App.Latency, "latency", conf.App.Latency, "srt protocol latency in ms")
 	flag.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
 		`relay buffer size in bytes, determines maximum delay of a client`)
 	flag.Parse()
+
+	conf.App.Addresses = strings.Split(addresses, ",")
 
 	auth, err := config.GetAuthenticator(conf.Auth)
 	if err != nil {
@@ -72,7 +76,7 @@ func main() {
 
 	serverConfig := srt.Config{
 		Server: srt.ServerConfig{
-			Address:     conf.App.Address,
+			Addresses:   conf.App.Addresses,
 			Latency:     conf.App.Latency,
 			LossMaxTTL:  conf.App.LossMaxTTL,
 			SyncClients: conf.App.SyncClients,
