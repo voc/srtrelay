@@ -24,7 +24,7 @@ func TestServerImpl_GetStatistics(t *testing.T) {
 	r := relay.NewRelay(&relay.RelayConfig{})
 	s := &ServerImpl{
 		relay:  r,
-		config: &ServerConfig{Address: "127.0.0.1:1337"},
+		config: &ServerConfig{Addresses: []string{"127.0.0.1:1337", "[::1]:1337"}},
 	}
 	r.Publish("s1")
 	r.Subscribe("s1")
