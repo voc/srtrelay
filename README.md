@@ -30,7 +30,7 @@ go build
 ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:1337?streamid=publish/test
 
 # start subscriber
-ffplay srt://localhost:1337?streamid=play/test
+ffplay -fflags nobuffer srt://localhost:1337?streamid=play/test
 ```
 
 ### Commandline Flags
