@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"github.com/haivision/srtgo"
 	"github.com/voc/srtrelay/api"
 	"github.com/voc/srtrelay/config"
 	"github.com/voc/srtrelay/relay"
@@ -86,17 +86,18 @@ func main() {
 	// setup graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	handleSignal(ctx, cancel)
-	defer cancel()
 
 	// create server
+	srtgo.InitSRT()
 	srtServer := srt.NewServer(&serverConfig)
 	err = srtServer.Listen(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	var apiServer *api.Server
 	if conf.API.Enabled {
-		apiServer := api.NewServer(conf.API, srtServer)
+		apiServer = api.NewServer(conf.API, srtServer)
 		err := apiServer.Listen(ctx)
 		if err != nil {
 			log.Fatal(err)
@@ -105,6 +106,9 @@ func main() {
 	}
 
 	// Wait for graceful shutdown
-	<-ctx.Done()
-	time.Sleep(200 * time.Millisecond)
+	srtServer.Wait()
+	if apiServer != nil {
+		apiServer.Wait()
+	}
+	srtgo.CleanupSRT()
 }

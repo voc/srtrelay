@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/voc/srtrelay/config"
@@ -15,6 +16,7 @@ import (
 type Server struct {
 	conf      config.APIConfig
 	srtServer srt.Server
+	done      sync.WaitGroup
 }
 
 func NewServer(conf config.APIConfig, srtServer srt.Server) *Server {
@@ -36,10 +38,17 @@ func (s *Server) Listen(ctx context.Context) error {
 		MaxHeaderBytes: 1 << 14,
 	}
 
+	s.done.Add(1)
 	go func() {
-		log.Fatal(serv.ListenAndServe())
+		defer s.done.Done()
+		err := serv.ListenAndServe()
+		if err != nil {
+			log.Println(err)
+		}
 	}()
+	s.done.Add(1)
 	go func() {
+		defer s.done.Done()
 		<-ctx.Done()
 		ctx2, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
@@ -47,6 +56,11 @@ func (s *Server) Listen(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+// Wait blocks until listening sockets have been closed
+func (s *Server) Wait() {
+	s.done.Wait()
 }
 
 func (s *Server) HandleStreams(w http.ResponseWriter, r *http.Request) {

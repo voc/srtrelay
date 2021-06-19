@@ -41,6 +41,7 @@ type ServerConfig struct {
 // Server is an interface for a srt relay server
 type Server interface {
 	Listen(context.Context) error
+	Wait()
 	Handle(context.Context, *srtgo.SrtSocket, *net.UDPAddr)
 	GetStatistics() []*relay.StreamStatistics
 	GetSocketStatistics() []*SocketStatistics
@@ -53,6 +54,7 @@ type ServerImpl struct {
 
 	mutex sync.Mutex
 	conns map[*srtConn]bool
+	done  sync.WaitGroup
 }
 
 // NewServer creates a server
@@ -97,6 +99,11 @@ func (s *ServerImpl) Listen(ctx context.Context) error {
 	return nil
 }
 
+// Wait blocks until listening sockets have been closed
+func (s *ServerImpl) Wait() {
+	s.done.Wait()
+}
+
 func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *net.UDPAddr, idstring string) bool {
 	var streamid stream.StreamID
 
@@ -130,12 +137,16 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 		return fmt.Errorf("Listen failed: %v", err)
 	}
 
+	s.done.Add(1)
 	go func() {
+		defer s.done.Done()
 		<-ctx.Done()
 		sck.Close()
 	}()
 
+	s.done.Add(1)
 	go func() {
+		defer s.done.Done()
 		for {
 			sock, addr, err := sck.Accept()
 			if err != nil {
