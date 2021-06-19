@@ -97,6 +97,25 @@ func (s *ServerImpl) Listen(ctx context.Context) error {
 	return nil
 }
 
+func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *net.UDPAddr, idstring string) bool {
+	var streamid stream.StreamID
+
+	// Parse stream id
+	if err := streamid.FromString(idstring); err != nil {
+		log.Println(err)
+		return false
+	}
+
+	// Check authentication
+	if !s.config.Auth.Authenticate(streamid) {
+		log.Printf("%s - Stream '%s' access denied\n", addr, streamid)
+		socket.SetRejectReason(srtgo.RejectionReasonUnauthorized)
+		return false
+	}
+
+	return true
+}
+
 func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) error {
 	options := make(map[string]string)
 	options["blocking"] = "0"
@@ -105,6 +124,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 
 	sck := srtgo.NewSrtSocket(host, port, options)
 	sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL))
+	sck.SetListenCallback(s.listenCallback)
 	err := sck.Listen(1)
 	if err != nil {
 		return fmt.Errorf("Listen failed: %v", err)
@@ -154,12 +174,6 @@ func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *ne
 	// Parse stream id
 	if err := streamid.FromString(idstring); err != nil {
 		log.Println(err)
-		return
-	}
-
-	// Check authentication
-	if !s.config.Auth.Authenticate(streamid) {
-		log.Printf("%s - Stream '%s' access denied\n", addr, streamid)
 		return
 	}
 
