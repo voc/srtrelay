@@ -132,7 +132,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 	sck := srtgo.NewSrtSocket(host, port, options)
 	sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL))
 	sck.SetListenCallback(s.listenCallback)
-	err := sck.Listen(1)
+	err := sck.Listen(5)
 	if err != nil {
 		return fmt.Errorf("Listen failed: %v", err)
 	}
@@ -241,7 +241,7 @@ func (s *ServerImpl) play(conn *srtConn) error {
 			} else if init != nil {
 				for i := range init {
 					buf := init[i]
-					conn.socket.Write(buf, len(buf))
+					conn.socket.Write(buf)
 				}
 				playing = true
 			}
@@ -249,7 +249,7 @@ func (s *ServerImpl) play(conn *srtConn) error {
 		}
 
 		// Write to socket
-		_, err := conn.socket.Write(buf, len(buf))
+		_, err := conn.socket.Write(buf)
 		if err != nil {
 			return err
 		}
@@ -269,7 +269,7 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 		// Push read buffers to all clients via the publish channel
 		// a ringbuffer would probably be more efficient
 		buf := make([]byte, PacketSize)
-		n, err := conn.socket.Read(buf, PacketSize)
+		n, err := conn.socket.Read(buf)
 		if err != nil {
 			return err
 		}
