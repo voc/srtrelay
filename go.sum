@@ -124,6 +124,8 @@ github.com/haivision/srtgo v0.0.0-20210618210508-765827cb3359 h1:BeR8ckl16Sq58HR
 github.com/haivision/srtgo v0.0.0-20210618210508-765827cb3359/go.mod h1:aTd4vOr9wtzkCbbocUFh6atlJy7H/iV5jhqEWlTdCdA=
 github.com/haivision/srtgo v0.0.0-20210707105407-e9647d6a3481 h1:pDrpB4eB2ePweFWn/WFbwZ09Whz7YvJz0YBytJX/33w=
 github.com/haivision/srtgo v0.0.0-20210707105407-e9647d6a3481/go.mod h1:aTd4vOr9wtzkCbbocUFh6atlJy7H/iV5jhqEWlTdCdA=
+github.com/haivision/srtgo v0.0.0-20210708214141-ea719a26f9f2 h1:HKdjXwZFfmHEqg0yh4c9/glEYbN3XHWTsSMgUjtiwoQ=
+github.com/haivision/srtgo v0.0.0-20210708214141-ea719a26f9f2/go.mod h1:aTd4vOr9wtzkCbbocUFh6atlJy7H/iV5jhqEWlTdCdA=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/go-cleanhttp v0.5.0/go.mod h1:JpRdi6/HCYpAwUzNwuwqhbovhLtngrth3wmdIIUrZ80=
 github.com/hashicorp/go-cleanhttp v0.5.1/go.mod h1:JpRdi6/HCYpAwUzNwuwqhbovhLtngrth3wmdIIUrZ80=
