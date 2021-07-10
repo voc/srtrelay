@@ -203,7 +203,7 @@ func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *ne
 		err = s.publish(conn)
 	}
 	if err != nil {
-		log.Printf("%s - %v", conn.address, err)
+		log.Printf("%s - %s - %v", conn.address, conn.streamid.Name(), err)
 	}
 }
 
@@ -223,7 +223,7 @@ func (s *ServerImpl) play(conn *srtConn) error {
 
 		buffered := len(sub)
 		if buffered > 144 {
-			log.Printf("%s - %d packets late in buffer\n", conn.address, len(sub))
+			log.Printf("%s - %s - %d packets late in buffer\n", conn.address, conn.streamid.Name(), len(sub))
 		}
 
 		// Upstream closed, drop connection
