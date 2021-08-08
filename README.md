@@ -3,8 +3,16 @@ Streaming-Relay for the SRT-protocol
 
 Use at your own risk
 
-## Dependencies
-Requires libsrt-1.4.2
+## Build with docker
+You will need atleast docker-20.10
+
+```
+docker build -t srtrelay .
+```
+
+## Build manually
+### Install Dependencies
+Requires >=libsrt-1.4.2, golang and a C compiler
 
 **Ubuntu**
   - you will need to [build libsrt yourself](https://github.com/Haivision/srt#build-on-linux)
@@ -16,15 +24,17 @@ Requires libsrt-1.4.2
 **Gentoo**:
   - emerge net-libs/srt
 
-## Build
+### Build
 ```
-go build
+go build -o srtrelay
 ```
 
 ## Usage
 ```bash
-# start relay
+# start relay (built manually)
 ./srtrelay
+
+
 
 # start publisher
 ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:1337?streamid=publish/test
@@ -48,7 +58,7 @@ The configuration file can be placed under *config.toml* in the current working 
 See [docs/API.md](docs/API.md) for more information about the API.
 
 ## Contributing
-See [docts/Contributing.md](docs/Contributing.md)
+See [docs/Contributing.md](docs/Contributing.md)
 
 ## Credits
 Thanks go to
