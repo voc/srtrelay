@@ -1,16 +1,37 @@
 # srtrelay ![CI](https://github.com/voc/srtrelay/workflows/CI/badge.svg)
 Streaming-Relay for the SRT-protocol
 
-Use at your own risk
+Use at your own risk.
+
+## Quick start
+Run with docker (**Note:** nightly image not recommended for production)
+```bash
+docker run ghcr.io/voc/srtrelay/srtrelay:latest
+
+# start publisher
+ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:1337?streamid=publish/test
+
+# start subscriber
+ffplay -fflags nobuffer srt://localhost:1337?streamid=play/test
+```
+
+Start docker with custom config. See [config.toml.example](config.toml.example)
+```bash
+# provide your own config from the local directory
+docker run -v $(pwd)/config.yml:/home/srtrelay/config.yml ghcr.io/voc/srtrelay/srtrelay:latest
+```
 
 ## Build with docker
 You will need atleast docker-20.10
 
-```
+```bash
 docker build -t srtrelay .
+
+# run srtrelay
+docker run --rm -it srtrelay
 ```
 
-## Build manually
+## Build without docker
 ### Install Dependencies
 Requires >=libsrt-1.4.2, golang and a C compiler
 
@@ -25,24 +46,14 @@ Requires >=libsrt-1.4.2, golang and a C compiler
   - emerge net-libs/srt
 
 ### Build
-```
+```bash
 go build -o srtrelay
+
+# run srtrelay
+./srtrelay
 ```
 
 ## Usage
-```bash
-# start relay (built manually)
-./srtrelay
-
-
-
-# start publisher
-ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:1337?streamid=publish/test
-
-# start subscriber
-ffplay -fflags nobuffer srt://localhost:1337?streamid=play/test
-```
-
 ### Commandline Flags
 ```bash
 # List available flags
