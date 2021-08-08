@@ -1,6 +1,7 @@
 name: Docker
 
 on:
+  workflow_dispatch:
   schedule:
     # run every second morning
     - cron: '30 5 1/2 * *'
