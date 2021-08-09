@@ -73,23 +73,23 @@ func (s *ServerImpl) Listen(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if len(host) == 0 {
-		}
+
 		port, err := strconv.ParseUint(portString, 10, 16)
 		if err != nil {
 			return err
 		}
-		var addrs []string
-		if len(host) != 0 {
-			addrs, err = net.LookupHost(host)
+
+		var addresses []string
+		if len(host) > 0 {
+			addresses, err = net.LookupHost(host)
 			if err != nil {
 				return err
 			}
 		} else {
-			addrs = []string{"0.0.0.0", "[::]"}
+			addresses = []string{"::"}
 		}
 
-		for _, address := range addrs {
+		for _, address := range addresses {
 			err := s.listenAt(ctx, address, uint16(port))
 			if err != nil {
 				return err

@@ -61,7 +61,7 @@ func main() {
 
 	// actual flags, use config as default and storage
 	var addresses string
-	flag.StringVar(&addresses, "addresses", strings.Join(conf.App.Addresses, ","), "relay bind addresses, seperated by commata")
+	flag.StringVar(&addresses, "addresses", strings.Join(conf.App.Addresses, ","), "relay bind addresses, separated by commata")
 	flag.UintVar(&conf.App.Latency, "latency", conf.App.Latency, "srt protocol latency in ms")
 	flag.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
 		`relay buffer size in bytes, determines maximum delay of a client`)

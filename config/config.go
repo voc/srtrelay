@@ -18,6 +18,7 @@ type Config struct {
 }
 
 type AppConfig struct {
+	Address     string
 	Addresses   []string
 	Latency     uint
 	Buffersize  uint
@@ -104,6 +105,12 @@ func Parse(paths []string) (*Config, error) {
 		}
 	} else {
 		log.Println("Config file not found, using defaults")
+	}
+
+	// support old config files
+	if config.App.Address != "" {
+		log.Println("Note: config option address is deprecated, please use addresses")
+		config.App.Addresses = []string{config.App.Address}
 	}
 
 	return &config, nil
