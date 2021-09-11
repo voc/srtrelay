@@ -18,7 +18,7 @@ ffplay -fflags nobuffer srt://localhost:1337?streamid=play/test
 Start docker with custom config. See [config.toml.example](config.toml.example)
 ```bash
 # provide your own config from the local directory
-docker run -v $(pwd)/config.yml:/home/srtrelay/config.yml ghcr.io/voc/srtrelay/srtrelay:latest
+docker run -v $(pwd)/config.toml:/home/srtrelay/config.toml ghcr.io/voc/srtrelay/srtrelay:latest
 ```
 
 ## Build with docker
