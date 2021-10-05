@@ -196,7 +196,9 @@ func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *ne
 		streamid: &streamid,
 	}
 
-	s.registerForStats(ctx, conn)
+	subctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	s.registerForStats(subctx, conn)
 
 	switch streamid.Mode() {
 	case stream.ModePlay:
