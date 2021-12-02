@@ -1,4 +1,12 @@
-srtrelay (0.1.0) buster; urgency=medium
+srtrelay (1.0.0) buster; urgency=medium
+
+  * Add early auth in SRT listen-callback
+  * Fix graceful shutdown
+  * Allow listening on multiple addresses
+
+ -- ischluff <ischluff@mailbox.org>  Thu, 02 Dec 2021 21:38:00 +0100
+
+ srtrelay (0.1.0) buster; urgency=medium
 
   * Initial release.
 
