@@ -24,7 +24,7 @@ func TestServerImpl_GetStatistics(t *testing.T) {
 	r := relay.NewRelay(&relay.RelayConfig{})
 	s := &ServerImpl{
 		relay:  r,
-		config: &ServerConfig{Addresses: []string{"127.0.0.1:1337", "[::1]:1337"}},
+		config: &ServerConfig{Addresses: []string{"127.0.0.1:1337", "[::1]:1337"}, PublicAddress: "testserver.de:1337"},
 	}
 	r.Publish("s1")
 	r.Subscribe("s1")
@@ -32,7 +32,7 @@ func TestServerImpl_GetStatistics(t *testing.T) {
 	streams := s.GetStatistics()
 
 	expected := []*relay.StreamStatistics{
-		{Name: "s1", URL: "srt://127.0.0.1:1337?streamid=play/s1", Clients: 2, Created: streams[0].Created},
+		{Name: "s1", URL: "srt://testserver.de:1337?streamid=play/s1", Clients: 2, Created: streams[0].Created},
 	}
 	if err := compareStats(streams, expected); err != nil {
 		t.Error(err)

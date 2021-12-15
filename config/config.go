@@ -5,8 +5,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/Showmax/go-fqdn"
 	"github.com/pelletier/go-toml"
 	"github.com/voc/srtrelay/auth"
 )
@@ -18,12 +20,13 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Address     string
-	Addresses   []string
-	Latency     uint
-	Buffersize  uint
-	SyncClients bool
-	LossMaxTTL  uint
+	Address       string
+	Addresses     []string
+	PublicAddress string
+	Latency       uint
+	Buffersize    uint
+	SyncClients   bool
+	LossMaxTTL    uint
 }
 
 type AuthConfig struct {
@@ -48,6 +51,22 @@ func GetAuthenticator(conf AuthConfig) (auth.Authenticator, error) {
 	default:
 		return nil, fmt.Errorf("Unknown auth type '%v'", conf.Type)
 	}
+}
+
+func getHostname() string {
+	name, err := fqdn.FqdnHostname()
+	if err != nil {
+		log.Println("fqdn:", err)
+		if err != fqdn.ErrFqdnNotFound {
+			return name
+		}
+
+		name, err = os.Hostname()
+		if err != nil {
+			log.Println("hostname:", err)
+		}
+	}
+	return name
 }
 
 // Parse tries to find and parse config from paths in order
@@ -111,6 +130,16 @@ func Parse(paths []string) (*Config, error) {
 	if config.App.Address != "" {
 		log.Println("Note: config option address is deprecated, please use addresses")
 		config.App.Addresses = []string{config.App.Address}
+	}
+
+	// guess public address if not set
+	if config.App.PublicAddress == "" {
+		split := strings.Split(config.App.Addresses[0], ":")
+		if len(split) < 2 {
+			log.Fatal("Invalid address: ", config.App.Addresses[0])
+		}
+		config.App.PublicAddress = fmt.Sprintf("%s:%s", getHostname(), split[len(split)-1])
+		log.Println("Note: assuming public address", config.App.PublicAddress)
 	}
 
 	return &config, nil

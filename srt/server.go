@@ -30,11 +30,12 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Addresses   []string
-	Latency     uint
-	LossMaxTTL  uint
-	Auth        auth.Authenticator
-	SyncClients bool
+	Addresses     []string
+	PublicAddress string
+	Latency       uint
+	LossMaxTTL    uint
+	Auth          auth.Authenticator
+	SyncClients   bool
 }
 
 // Server is an interface for a srt relay server
@@ -306,7 +307,7 @@ func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
 func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
 	streams := s.relay.GetStatistics()
 	for _, stream := range streams {
-		stream.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.Addresses[0], stream.Name)
+		stream.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.PublicAddress, stream.Name)
 	}
 	return streams
 }

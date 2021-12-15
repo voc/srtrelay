@@ -76,11 +76,12 @@ func main() {
 
 	serverConfig := srt.Config{
 		Server: srt.ServerConfig{
-			Addresses:   conf.App.Addresses,
-			Latency:     conf.App.Latency,
-			LossMaxTTL:  conf.App.LossMaxTTL,
-			SyncClients: conf.App.SyncClients,
-			Auth:        auth,
+			Addresses:     conf.App.Addresses,
+			PublicAddress: conf.App.PublicAddress,
+			Latency:       conf.App.Latency,
+			LossMaxTTL:    conf.App.LossMaxTTL,
+			SyncClients:   conf.App.SyncClients,
+			Auth:          auth,
 		},
 		Relay: relay.RelayConfig{
 			Buffersize: conf.App.Buffersize, // 1s @ 3Mbits/
