@@ -75,8 +75,8 @@ func TestRelayImpl_DoublePublish(t *testing.T) {
 	relay.Publish("foo")
 	_, err := relay.Publish("foo")
 
-	if err != StreamAlreadyExists {
-		t.Errorf("Publish to existing stream should return '%s', got '%s'", StreamAlreadyExists, err)
+	if err != ErrStreamAlreadyExists {
+		t.Errorf("Publish to existing stream should return '%s', got '%s'", ErrStreamAlreadyExists, err)
 	}
 }
 
@@ -85,7 +85,7 @@ func TestRelayImpl_SubscribeNonExisting(t *testing.T) {
 	relay := NewRelay(&config)
 
 	_, _, err := relay.Subscribe("foobar")
-	if err != StreamNotExisting {
-		t.Errorf("Subscribe to non-existing stream should return '%s', got '%s'", StreamNotExisting, err)
+	if err != ErrStreamNotExisting {
+		t.Errorf("Subscribe to non-existing stream should return '%s', got '%s'", ErrStreamNotExisting, err)
 	}
 }

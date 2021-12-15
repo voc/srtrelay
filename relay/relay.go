@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	StreamAlreadyExists = errors.New("Stream already exists")
-	StreamNotExisting   = errors.New("Stream does not exist")
+	ErrStreamAlreadyExists = errors.New("stream already exists")
+	ErrStreamNotExisting   = errors.New("stream does not exist")
 )
 
 type RelayConfig struct {
@@ -50,13 +50,13 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 	defer s.mutex.Unlock()
 
 	if _, exists := s.channels[name]; exists {
-		return nil, StreamAlreadyExists
+		return nil, ErrStreamAlreadyExists
 	}
 
 	channel := NewChannel(s.config.Buffersize)
 	s.channels[name] = channel
 
-	ch := make(chan []byte, 0)
+	ch := make(chan []byte)
 
 	// Setup publisher goroutine
 	go func() {
@@ -87,7 +87,7 @@ func (s *RelayImpl) Subscribe(name string) (<-chan []byte, UnsubscribeFunc, erro
 	defer s.mutex.Unlock()
 	channel, ok := s.channels[name]
 	if !ok {
-		return nil, nil, StreamNotExisting
+		return nil, nil, ErrStreamNotExisting
 	}
 	ch, unsub := channel.Sub()
 	return ch, unsub, nil
