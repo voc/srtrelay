@@ -227,13 +227,13 @@ func (s *ServerImpl) play(conn *srtConn) error {
 		buf, ok := <-sub
 
 		buffered := len(sub)
-		if buffered > 144 {
+		if buffered > cap(sub)/2 {
 			log.Printf("%s - %s - %d packets late in buffer\n", conn.address, conn.streamid.Name(), len(sub))
 		}
 
 		// Upstream closed, drop connection
 		if !ok {
-			log.Println("dropping", conn.address)
+			log.Printf("%s - %s dropped", conn.address, conn.streamid.Name())
 			return nil
 		}
 

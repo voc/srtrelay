@@ -208,7 +208,7 @@ func (p *Parser) ParsePSI(data []byte) (bool, error) {
 				case StreamTypeH264:
 					p.tspMap[elementaryPID] = &ElementaryStream{CodecParser: H264Parser{}}
 				default:
-					log.Println("Unknown streamtype", elementaryPID)
+					// log.Println("Unknown streamtype", elementaryPID)
 				}
 			}
 
