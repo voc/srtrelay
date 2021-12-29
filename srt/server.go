@@ -159,7 +159,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 					return
 				default:
 				}
-				log.Fatalln("accept failed", err)
+				log.Println("accept failed", err)
 			}
 			go s.Handle(ctx, sock, addr)
 		}
