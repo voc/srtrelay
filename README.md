@@ -21,6 +21,30 @@ Start docker with custom config. See [config.toml.example](config.toml.example)
 docker run -v $(pwd)/config.toml:/home/srtrelay/config.toml ghcr.io/voc/srtrelay/srtrelay:latest
 ```
 
+## Run with docker-compose
+
+In your `docker-compose.yml`:
+
+```yaml
+   srtrelay:
+     image: ghcr.io/voc/srtrelay/srtrelay:latest
+     restart: always
+     container_name: srtrelay
+     volumes:
+       - ./srtrelay-config.toml:/home/srtrelay/config.toml
+     ports:
+       - "44560:1337/udp"
+```
+
+This will forward port `44560` to internal port `1337` in the container. Importantly, forwarding UDP is required.
+It will also copy a `srtrelay-config.toml` file in the same directory into the container to use as config.toml
+
+Start the server with the usual
+
+```bash
+docker-compose up -d
+```
+
 ## Build with docker
 You will need atleast docker-20.10
 
