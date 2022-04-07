@@ -33,6 +33,7 @@ type ServerConfig struct {
 	Addresses     []string
 	PublicAddress string
 	Latency       uint
+	ListenTimeout uint
 	LossMaxTTL    uint
 	Auth          auth.Authenticator
 	SyncClients   bool
@@ -130,6 +131,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 	options := make(map[string]string)
 	options["blocking"] = "0"
 	options["transtype"] = "live"
+	options["listen_timeout"] = strconv.Itoa(int(s.config.ListenTimeout))
 	options["latency"] = strconv.Itoa(int(s.config.Latency))
 
 	sck := srtgo.NewSrtSocket(host, port, options)
