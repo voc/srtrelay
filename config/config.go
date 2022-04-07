@@ -24,6 +24,7 @@ type AppConfig struct {
 	Addresses     []string
 	PublicAddress string
 	Latency       uint
+	ListenTimeout uint
 	Buffersize    uint
 	SyncClients   bool
 	LossMaxTTL    uint
@@ -76,6 +77,7 @@ func Parse(paths []string) (*Config, error) {
 		App: AppConfig{
 			Addresses:   []string{"localhost:1337"},
 			Latency:     200,
+			ListenTimeout: 3000,
 			LossMaxTTL:  0,
 			Buffersize:  384000,
 			SyncClients: false,
