@@ -1,0 +1,19 @@
+syntax = "proto3";
+package voc.srtrelay.proto;
+// import "google/protobuf/empty.proto";
+option go_package = "github.com/voc/srtrelay/proto";
+
+message AddStream {
+  string slug = 1;
+}
+
+message RemoveStream {
+  string slug = 1;
+}
+
+message Notification {
+  oneof payload {
+    AddStream add_stream = 1;
+    RemoveStream remove_stream = 2;
+  } 
+}
