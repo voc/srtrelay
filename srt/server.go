@@ -6,11 +6,13 @@ import "C"
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/haivision/srtgo"
 	"github.com/voc/srtrelay/auth"
@@ -120,7 +122,9 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 	// Check authentication
 	if !s.config.Auth.Authenticate(streamid) {
 		log.Printf("%s - Stream '%s' access denied\n", addr, streamid)
-		socket.SetRejectReason(srtgo.RejectionReasonUnauthorized)
+		if err := socket.SetRejectReason(srtgo.RejectionReasonUnauthorized); err != nil {
+			log.Printf("Error rejecting stream: %s", err)
+		}
 		return false
 	}
 
@@ -135,26 +139,33 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 	options["latency"] = strconv.Itoa(int(s.config.Latency))
 
 	sck := srtgo.NewSrtSocket(host, port, options)
-	sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL))
+	if err := sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL)); err != nil {
+		log.Printf("Error settings lossmaxttl: %s", err)
+	}
 	sck.SetListenCallback(s.listenCallback)
 	err := sck.Listen(5)
 	if err != nil {
 		return fmt.Errorf("Listen failed for %v:%v : %v", host, port, err)
 	}
 
-	s.done.Add(1)
+	s.done.Add(2)
+	// server socket closer
 	go func() {
 		defer s.done.Done()
 		<-ctx.Done()
 		sck.Close()
 	}()
 
-	s.done.Add(1)
+	// accept loop
 	go func() {
 		defer s.done.Done()
 		for {
+			sck.SetReadDeadline(time.Now().Add(time.Millisecond * 300))
 			sock, addr, err := sck.Accept()
 			if err != nil {
+				if errors.Is(err, &srtgo.SrtEpollTimeout{}) {
+					continue
+				}
 				// exit silently if context closed
 				select {
 				case <-ctx.Done():
@@ -162,6 +173,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 				default:
 				}
 				log.Println("accept failed", err)
+				continue
 			}
 			go s.Handle(ctx, sock, addr)
 		}
@@ -248,7 +260,10 @@ func (s *ServerImpl) play(conn *srtConn) error {
 			} else if init != nil {
 				for i := range init {
 					buf := init[i]
-					conn.socket.Write(buf)
+					_, err := conn.socket.Write(buf)
+					if err != nil {
+						log.Println()
+					}
 				}
 				playing = true
 			}
