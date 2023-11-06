@@ -30,13 +30,16 @@ addresses = ["localhost:1337"]
 
 # SRT protocol `listen_timeout`, value set in milliseconds. Sets the socket listen timeout, or the
 # maximum time to wait for a response from the client before dropping the connection
-#listen_timeout = 3000
+#listenTimeout = 3000
 
 # Experimental: synchronize MPEG-TS clients to a GOP start
 # This should not increase playback delay, just make sure the client always
 # starts with a clean packet stream.
 # Currently just implemented for H.264
 #syncClients = false
+
+# Set packet size in Bytes for SRT socket, 1316 Bytes is generally used for MPEG-TS the maximum is 1456 Bytes
+#packetSize = 1316
 
 [api]
 # Set to false to disable the API endpoint
