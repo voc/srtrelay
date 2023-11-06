@@ -1,0 +1,21 @@
+[app]
+addresses = ["127.0.0.1:5432"]
+latency = 1337
+buffersize = 123000
+syncClients = true
+
+[api]
+enabled = false
+address = ":1234"
+
+[auth]
+type = "http"
+
+[auth.static]
+allow = ["play/*"]
+
+[auth.http]
+url = "http://localhost:1235/publish"
+timeout = "5s"
+application = "foo"
+passwordParam = "pass"

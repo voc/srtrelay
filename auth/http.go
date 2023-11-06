@@ -14,11 +14,22 @@ type httpAuth struct {
 	client *http.Client
 }
 
+type Duration time.Duration
+
+func (d *Duration) UnmarshalText(b []byte) error {
+	x, err := time.ParseDuration(string(b))
+	if err != nil {
+		return err
+	}
+	*d = Duration(x)
+	return nil
+}
+
 type HTTPAuthConfig struct {
 	URL           string
 	Application   string
-	Timeout       time.Duration // Timeout for Auth request
-	PasswordParam string        // POST Parameter containing stream passphrase
+	Timeout       Duration // Timeout for Auth request
+	PasswordParam string   // POST Parameter containing stream passphrase
 }
 
 // NewHttpAuth creates an Authenticator with a HTTP backend
@@ -26,7 +37,7 @@ func NewHTTPAuth(config HTTPAuthConfig) *httpAuth {
 	return &httpAuth{
 		config: config,
 		client: &http.Client{
-			Timeout: config.Timeout,
+			Timeout: time.Duration(config.Timeout),
 		},
 	}
 }
@@ -44,7 +55,6 @@ func (h *httpAuth) Authenticate(streamid stream.StreamID) bool {
 		"name":                 {streamid.Name()},
 		h.config.PasswordParam: {streamid.Password()},
 	})
-
 	if err != nil {
 		log.Println("http-auth:", err)
 		return false

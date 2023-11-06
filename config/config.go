@@ -2,14 +2,13 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/Showmax/go-fqdn"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/voc/srtrelay/auth"
 )
 
@@ -75,12 +74,12 @@ func Parse(paths []string) (*Config, error) {
 	// set defaults
 	config := Config{
 		App: AppConfig{
-			Addresses:   []string{"localhost:1337"},
-			Latency:     200,
+			Addresses:     []string{"localhost:1337"},
+			Latency:       200,
 			ListenTimeout: 3000,
-			LossMaxTTL:  0,
-			Buffersize:  384000,
-			SyncClients: false,
+			LossMaxTTL:    0,
+			Buffersize:    384000,
+			SyncClients:   false,
 		},
 		Auth: AuthConfig{
 			Type: "static",
@@ -90,7 +89,7 @@ func Parse(paths []string) (*Config, error) {
 			},
 			HTTP: auth.HTTPAuthConfig{
 				URL:           "http://localhost:8080/publish",
-				Timeout:       time.Second,
+				Timeout:       auth.Duration(time.Second),
 				Application:   "stream",
 				PasswordParam: "auth",
 			},
@@ -106,7 +105,7 @@ func Parse(paths []string) (*Config, error) {
 
 	// try to read file from given paths
 	for _, path := range paths {
-		data, err = ioutil.ReadFile(path)
+		data, err = os.ReadFile(path)
 		if err == nil {
 			log.Println("Read config from", path)
 			break
