@@ -2,7 +2,6 @@ package mpegts
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -80,7 +79,7 @@ func checkParser(t *testing.T, p *Parser, data []byte, name string, numFrames in
 		t.Errorf("%s - Init should not be nil", name)
 	}
 
-	file, err := ioutil.TempFile("", "srttest")
+	file, err := os.CreateTemp("", "srttest")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,10 +87,16 @@ func checkParser(t *testing.T, p *Parser, data []byte, name string, numFrames in
 
 	for i := range pkts {
 		buf := pkts[i]
-		file.Write(buf)
+		if _, err := file.Write(buf); err != nil {
+			t.Error(err)
+		}
 	}
-	file.Write(data[offset:])
-	file.Sync()
+	if _, err := file.Write(data[offset:]); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Sync(); err != nil {
+		t.Fatal(err)
+	}
 
 	// compare ffprobe results with original
 	got, err := ffprobe(file.Name())
@@ -103,7 +108,7 @@ func checkParser(t *testing.T, p *Parser, data []byte, name string, numFrames in
 
 func TestParser_ParseH264_basic(t *testing.T) {
 	// Parse 1s complete MPEG-TS with NAL at start
-	data, err := ioutil.ReadFile("h264.ts")
+	data, err := os.ReadFile("h264.ts")
 	if err != nil {
 		t.Fatalf("failed to open test file")
 	}
@@ -113,7 +118,7 @@ func TestParser_ParseH264_basic(t *testing.T) {
 
 func TestParser_ParseH264_complex(t *testing.T) {
 	// Parse 1s complete MPEG-TS with NAL at start
-	data, err := ioutil.ReadFile("h264_long.ts")
+	data, err := os.ReadFile("h264_long.ts")
 	if err != nil {
 		t.Fatalf("failed to open test file")
 	}

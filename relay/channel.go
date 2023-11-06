@@ -12,7 +12,7 @@ type UnsubscribeFunc func()
 type Channel struct {
 	mutex      sync.Mutex
 	subs       Subs
-	buffersize uint
+	maxPackets uint
 
 	// statistics
 	clients atomic.Value
@@ -47,10 +47,10 @@ func (subs Subs) Remove(sub chan []byte) Subs {
 	return subs[:len(subs)-1]     // Truncate slice.
 }
 
-func NewChannel(buffersize uint) *Channel {
+func NewChannel(maxPackets uint) *Channel {
 	ch := &Channel{
 		subs:       make([]chan []byte, 0, 10),
-		buffersize: buffersize,
+		maxPackets: maxPackets,
 		created:    time.Now(),
 	}
 	ch.clients.Store(0)
@@ -61,8 +61,7 @@ func NewChannel(buffersize uint) *Channel {
 func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	channelbuffer := ch.buffersize / 1316
-	sub := make(chan []byte, channelbuffer)
+	sub := make(chan []byte, ch.maxPackets)
 	ch.subs = append(ch.subs, sub)
 	ch.clients.Store(len(ch.subs))
 
@@ -95,7 +94,7 @@ func (ch *Channel) Pub(b []byte) {
 		// Remember overflowed chans for drop
 		default:
 			toRemove = append(toRemove, ch.subs[i])
-			log.Println("dropping client", i)
+			log.Println("dropping overflowing client", i)
 		}
 	}
 	for _, sub := range toRemove {

@@ -159,7 +159,6 @@ func (pkt *Packet) ToBytes(data []byte) error {
 		return ErrDataTooLong
 	}
 	copy(data[offset:offset+payloadLength], pkt.payload)
-	offset += payloadLength
 
 	return nil
 }

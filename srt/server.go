@@ -8,8 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -19,11 +21,6 @@ import (
 	"github.com/voc/srtrelay/format"
 	"github.com/voc/srtrelay/relay"
 	"github.com/voc/srtrelay/stream"
-)
-
-const (
-	// Make this configurable? max is 1456
-	PacketSize = 1316 // TS_UDP_LEN
 )
 
 type Config struct {
@@ -58,15 +55,18 @@ type ServerImpl struct {
 	mutex sync.Mutex
 	conns map[*srtConn]bool
 	done  sync.WaitGroup
+
+	pool *sync.Pool
 }
 
 // NewServer creates a server
-func NewServer(config *Config) Server {
+func NewServer(config *Config) *ServerImpl {
 	r := relay.NewRelay(&config.Relay)
 	return &ServerImpl{
 		relay:  r,
 		config: &config.Server,
 		conns:  make(map[*srtConn]bool),
+		pool:   newBufferPool(config.Relay.PacketSize),
 	}
 }
 
@@ -183,9 +183,16 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 
 // SRTConn wraps an srtsocket with additional state
 type srtConn struct {
-	socket   *srtgo.SrtSocket
-	address  *net.UDPAddr
+	socket   relaySocket
+	address  string
 	streamid *stream.StreamID
+}
+
+type relaySocket interface {
+	io.Reader
+	io.Writer
+	Close()
+	Stats() (*srtgo.SrtStats, error)
 }
 
 // Handle srt client connection
@@ -207,7 +214,7 @@ func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *ne
 
 	conn := &srtConn{
 		socket:   sock,
-		address:  addr,
+		address:  addr.String(),
 		streamid: &streamid,
 	}
 
@@ -251,7 +258,7 @@ func (s *ServerImpl) play(conn *srtConn) error {
 			return nil
 		}
 
-		// Find synchronization pointinitial
+		// Find initial synchronization point
 		// TODO: implement timeout for sync
 		if !playing {
 			init, err := demux.FindInit(buf)
@@ -262,7 +269,7 @@ func (s *ServerImpl) play(conn *srtConn) error {
 					buf := init[i]
 					_, err := conn.socket.Write(buf)
 					if err != nil {
-						log.Println()
+						return err
 					}
 				}
 				playing = true
@@ -288,20 +295,22 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 	log.Printf("%s - publish %s\n", conn.address, conn.streamid.Name())
 
 	for {
+		// Get buffer from pool and return sometime after use
+		buf := s.pool.Get().(*[]byte)
+		runtime.SetFinalizer(buf, func(buf *[]byte) {
+			s.pool.Put(buf)
+		})
+
+		n, err := conn.socket.Read(*buf)
+
 		// Push read buffers to all clients via the publish channel
-		// a ringbuffer would probably be more efficient
-		buf := make([]byte, PacketSize)
-		n, err := conn.socket.Read(buf)
+		if n > 0 {
+			pub <- (*buf)[:n]
+		}
+
 		if err != nil {
 			return err
 		}
-
-		// handle EOF
-		if n == 0 {
-			return nil
-		}
-
-		pub <- buf[:n]
 	}
 }
 
@@ -347,7 +356,7 @@ func (s *ServerImpl) GetSocketStatistics() []*SocketStatistics {
 			continue
 		}
 		statistics = append(statistics, &SocketStatistics{
-			Address:  conn.address.String(),
+			Address:  conn.address,
 			StreamID: conn.streamid.String(),
 			Stats:    srtStats,
 		})

@@ -37,7 +37,6 @@ func Test_httpAuth_Authenticate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			auth := NewHTTPAuth(HTTPAuthConfig{
 				URL: srv.URL + tt.url,
 			})

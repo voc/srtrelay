@@ -24,9 +24,18 @@ type AppConfig struct {
 	PublicAddress string
 	Latency       uint
 	ListenTimeout uint
-	Buffersize    uint
-	SyncClients   bool
-	LossMaxTTL    uint
+
+	// total buffer size in bytes, determines maximum delay of a client
+	Buffersize uint
+
+	// Whether to sync clients to GOP start
+	SyncClients bool
+
+	// The value up to which the Reorder Tolerance may grow, 0 by default
+	LossMaxTTL uint
+
+	// max size of packets in bytes, default is 1316
+	PacketSize uint
 }
 
 type AuthConfig struct {
@@ -78,8 +87,9 @@ func Parse(paths []string) (*Config, error) {
 			Latency:       200,
 			ListenTimeout: 3000,
 			LossMaxTTL:    0,
-			Buffersize:    384000,
+			Buffersize:    384000, // 1s @ 3Mbits/s
 			SyncClients:   false,
+			PacketSize:    1316, // max is 1456
 		},
 		Auth: AuthConfig{
 			Type: "static",

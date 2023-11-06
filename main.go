@@ -69,7 +69,8 @@ func main() {
 			Auth:          auth,
 		},
 		Relay: relay.RelayConfig{
-			Buffersize: conf.App.Buffersize, // 1s @ 3Mbits/
+			BufferSize: conf.App.Buffersize,
+			PacketSize: conf.App.PacketSize,
 		},
 	}
 

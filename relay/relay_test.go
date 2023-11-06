@@ -7,7 +7,7 @@ import (
 )
 
 func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
-	config := RelayConfig{Buffersize: 1316 * 50}
+	config := RelayConfig{BufferSize: 50, PacketSize: 1}
 	relay := NewRelay(&config)
 	data := []byte{1, 2, 3, 4}
 
@@ -46,7 +46,7 @@ func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
 }
 
 func TestRelayImpl_PublisherClose(t *testing.T) {
-	config := RelayConfig{Buffersize: 0}
+	config := RelayConfig{BufferSize: 1, PacketSize: 1}
 	relay := NewRelay(&config)
 
 	ch, _ := relay.Publish("test")
@@ -70,7 +70,7 @@ func TestRelayImpl_PublisherClose(t *testing.T) {
 }
 
 func TestRelayImpl_DoublePublish(t *testing.T) {
-	config := RelayConfig{Buffersize: 0}
+	config := RelayConfig{BufferSize: 1, PacketSize: 1}
 	relay := NewRelay(&config)
 	relay.Publish("foo")
 	_, err := relay.Publish("foo")
@@ -81,7 +81,7 @@ func TestRelayImpl_DoublePublish(t *testing.T) {
 }
 
 func TestRelayImpl_SubscribeNonExisting(t *testing.T) {
-	config := RelayConfig{Buffersize: 0}
+	config := RelayConfig{BufferSize: 1, PacketSize: 1}
 	relay := NewRelay(&config)
 
 	_, _, err := relay.Subscribe("foobar")

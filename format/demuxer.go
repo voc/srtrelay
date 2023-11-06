@@ -38,7 +38,6 @@ func DetermineTransport(data []byte) TransportType {
 // FindInit determines a synchronization point in the stream
 // Finally it returns the required stream packets up to that point
 func (d *Demuxer) FindInit(data []byte) ([][]byte, error) {
-
 	if d.transport == Unknown {
 		d.transport = DetermineTransport(data)
 	}

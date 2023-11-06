@@ -38,21 +38,25 @@ func (s *Server) Listen(ctx context.Context) error {
 		MaxHeaderBytes: 1 << 14,
 	}
 
-	s.done.Add(1)
+	s.done.Add(2)
+	// http listener
 	go func() {
 		defer s.done.Done()
 		err := serv.ListenAndServe()
-		if err != nil {
+		if err != nil && err != http.ErrServerClosed {
 			log.Println(err)
 		}
 	}()
-	s.done.Add(1)
+
+	// shutdown goroutine
 	go func() {
 		defer s.done.Done()
 		<-ctx.Done()
 		ctx2, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		serv.Shutdown(ctx2)
+		if err := serv.Shutdown(ctx2); err != nil {
+			log.Println(err)
+		}
 	}()
 
 	return nil
@@ -66,11 +70,15 @@ func (s *Server) Wait() {
 func (s *Server) HandleStreams(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	stats := s.srtServer.GetStatistics()
-	json.NewEncoder(w).Encode(stats)
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		log.Println(err)
+	}
 }
 
 func (s *Server) HandleSockets(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	stats := s.srtServer.GetSocketStatistics()
-	json.NewEncoder(w).Encode(stats)
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		log.Println(err)
+	}
 }

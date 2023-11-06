@@ -13,7 +13,8 @@ var (
 )
 
 type RelayConfig struct {
-	Buffersize uint
+	BufferSize uint
+	PacketSize uint
 }
 
 type Relay interface {
@@ -53,7 +54,7 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 		return nil, ErrStreamAlreadyExists
 	}
 
-	channel := NewChannel(s.config.Buffersize)
+	channel := NewChannel(s.config.BufferSize / s.config.PacketSize)
 	s.channels[name] = channel
 
 	ch := make(chan []byte)
@@ -67,7 +68,7 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 			if !ok {
 				// Need a lock on the map first to stop new subscribers
 				s.mutex.Lock()
-				log.Println("Removing stream", name)
+				log.Println("Unpublished stream", name)
 				delete(s.channels, name)
 				channel.Close()
 				s.mutex.Unlock()
