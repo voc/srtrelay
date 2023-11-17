@@ -67,6 +67,7 @@ func main() {
 			LossMaxTTL:    conf.App.LossMaxTTL,
 			SyncClients:   conf.App.SyncClients,
 			Auth:          auth,
+			ListenBacklog: conf.App.ListenBacklog,
 		},
 		Relay: relay.RelayConfig{
 			BufferSize: conf.App.Buffersize,

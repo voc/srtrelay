@@ -36,6 +36,7 @@ type ServerConfig struct {
 	LossMaxTTL    uint
 	Auth          auth.Authenticator
 	SyncClients   bool
+	ListenBacklog int
 }
 
 // Server is an interface for a srt relay server
@@ -143,7 +144,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 		log.Printf("Error settings lossmaxttl: %s", err)
 	}
 	sck.SetListenCallback(s.listenCallback)
-	err := sck.Listen(5)
+	err := sck.Listen(s.config.ListenBacklog)
 	if err != nil {
 		return fmt.Errorf("Listen failed for %v:%v : %v", host, port, err)
 	}

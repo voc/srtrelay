@@ -41,6 +41,9 @@ addresses = ["localhost:1337"]
 # Set packet size in Bytes for SRT socket, 1316 Bytes is generally used for MPEG-TS the maximum is 1456 Bytes
 #packetSize = 1316
 
+# Max number of pending clients in the accept queue
+#listenBacklog = 10
+
 [api]
 # Set to false to disable the API endpoint
 #enabled = true

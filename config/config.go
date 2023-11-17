@@ -36,6 +36,9 @@ type AppConfig struct {
 
 	// max size of packets in bytes, default is 1316
 	PacketSize uint
+
+	// max number of pending connections, default is 10
+	ListenBacklog int
 }
 
 type AuthConfig struct {
@@ -90,6 +93,7 @@ func Parse(paths []string) (*Config, error) {
 			Buffersize:    384000, // 1s @ 3Mbits/s
 			SyncClients:   false,
 			PacketSize:    1316, // max is 1456
+			ListenBacklog: 10,
 		},
 		Auth: AuthConfig{
 			Type: "static",
