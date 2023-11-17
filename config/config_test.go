@@ -19,7 +19,6 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, conf.App.SyncClients, true)
 	assert.Equal(t, conf.App.PacketSize, uint(1456))
 	assert.Equal(t, conf.App.LossMaxTTL, uint(50))
-	assert.Equal(t, conf.App.ListenTimeout, uint(5555))
 	assert.Equal(t, conf.App.PublicAddress, "dontlookmeup:5432")
 	assert.Equal(t, conf.App.ListenBacklog, 30)
 

@@ -28,10 +28,6 @@ addresses = ["localhost:1337"]
 # for more info
 #lossMaxTTL = 0
 
-# SRT protocol `listen_timeout`, value set in milliseconds. Sets the socket listen timeout, or the
-# maximum time to wait for a response from the client before dropping the connection
-#listenTimeout = 3000
-
 # Experimental: synchronize MPEG-TS clients to a GOP start
 # This should not increase playback delay, just make sure the client always
 # starts with a clean packet stream.

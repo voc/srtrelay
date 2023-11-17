@@ -5,8 +5,8 @@ buffersize = 123000
 syncClients = true
 packetSize = 1456
 lossMaxTTL= 50
-listenTimeout= 5555
 publicAddress = "dontlookmeup:5432"
+listenBacklog = 30
 
 [api]
 enabled = false
