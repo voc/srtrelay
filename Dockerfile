@@ -20,7 +20,8 @@ RUN apt-get update && \
 
 COPY . /build
 WORKDIR /build
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -v -o srtrelay .
+ARG TARGETARCH
+RUN GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-w -s" -v -o srtrelay .
 
 # clean start
 FROM debian:bullseye
