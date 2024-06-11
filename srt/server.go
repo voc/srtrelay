@@ -352,6 +352,7 @@ func (s *ServerImpl) GetSocketStatistics() []*SocketStatistics {
 	for conn := range s.conns {
 		srtStats, err := conn.socket.Stats()
 		if err != nil {
+			log.Printf("%s - error getting stats %s\n", conn.address, err)
 			continue
 		}
 		statistics = append(statistics, &SocketStatistics{
