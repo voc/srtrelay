@@ -65,35 +65,73 @@ func NewStreamID(name string, password string, mode Mode) (*StreamID, error) {
 // The second slash and password is optional and defaults to empty.
 // If error is not nil then StreamID will remain unchanged.
 func (s *StreamID) FromString(src string) error {
-	split := strings.Split(src, "/")
 
-	password := ""
-	if len(split) == 3 {
-		password = split[2]
-	} else if len(split) != 2 {
-		return InvalidSlashes
+	if strings.HasPrefix(src, "#!::") {
+		for _, kv := range strings.Split(src[len("#!::"):], ",") {
+			kv2 := strings.SplitN(kv, "=", 2)
+			if len(kv2) != 2 {
+				return fmt.Errorf("invalid value")
+			}
+
+			key, value := kv2[0], kv2[1]
+
+			switch key {
+			case "u":
+			//	s.user = value
+
+			case "r":
+				s.name = value
+
+			case "h":
+
+			case "s":
+				s.password = value
+
+			case "t":
+
+			case "m":
+				switch value {
+				case "request":
+					s.mode = ModePlay
+
+				case "publish":
+					s.mode = ModePublish
+
+				default:
+					return InvalidMode
+				}
+
+			default:
+				return fmt.Errorf("unsupported key '%s'", key)
+			}
+		}
+	} else {
+		split := strings.Split(src, "/")
+
+		s.password = ""
+		if len(split) == 3 {
+			s.password = split[2]
+		} else if len(split) != 2 {
+			return InvalidSlashes
+		}
+		modeStr := split[0]
+		s.name = split[1]
+
+		switch modeStr {
+		case "play":
+			s.mode = ModePlay
+		case "publish":
+			s.mode = ModePublish
+		default:
+			return InvalidMode
+		}
 	}
-	modeStr := split[0]
-	name := split[1]
 
-	if len(name) == 0 {
+	if len(s.name) == 0 {
 		return MissingName
 	}
 
-	var mode Mode
-	switch modeStr {
-	case "play":
-		mode = ModePlay
-	case "publish":
-		mode = ModePublish
-	default:
-		return InvalidMode
-	}
-
 	s.str = src
-	s.mode = mode
-	s.name = name
-	s.password = password
 	return nil
 }
 
