@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/minio/minio/pkg/wildcard"
+	"github.com/IGLOU-EU/go-wildcard/v2"
 )
 
 var (
@@ -122,7 +122,7 @@ func (s *StreamID) toString() (string, error) {
 // Match checks a streamid against a string with wildcards.
 // The string may contain * to match any number of characters.
 func (s StreamID) Match(pattern string) bool {
-	return wildcard.MatchSimple(pattern, s.str)
+	return wildcard.Match(pattern, s.str)
 }
 
 func (s StreamID) String() string {
