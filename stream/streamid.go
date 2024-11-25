@@ -8,6 +8,8 @@ import (
 	"github.com/IGLOU-EU/go-wildcard/v2"
 )
 
+const IDPrefix = "#!::"
+
 var (
 	InvalidSlashes      = errors.New("Invalid number of slashes, must be 1 or 2")
 	InvalidMode         = errors.New("Invalid mode")
@@ -43,7 +45,7 @@ type StreamID struct {
 	password string
 }
 
-// Creates new StreamID
+// NewStreamID creates new StreamID
 // returns error if mode is invalid.
 // id is nil on error
 func NewStreamID(name string, password string, mode Mode) (*StreamID, error) {
@@ -66,8 +68,8 @@ func NewStreamID(name string, password string, mode Mode) (*StreamID, error) {
 // If error is not nil then StreamID will remain unchanged.
 func (s *StreamID) FromString(src string) error {
 
-	if strings.HasPrefix(src, "#!::") {
-		for _, kv := range strings.Split(src[len("#!::"):], ",") {
+	if strings.HasPrefix(src, IDPrefix) {
+		for _, kv := range strings.Split(src[len(IDPrefix):], ",") {
 			kv2 := strings.SplitN(kv, "=", 2)
 			if len(kv2) != 2 {
 				return fmt.Errorf("invalid value")
