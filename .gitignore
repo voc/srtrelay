@@ -1,3 +1,7 @@
 srtrelay
 config.toml
+# VSCode
 /.vscode
+# Jetbrains
+/.idea
+*.iml
