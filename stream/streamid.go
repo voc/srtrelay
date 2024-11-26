@@ -15,6 +15,7 @@ var (
 	InvalidMode         = errors.New("Invalid mode")
 	MissingName         = errors.New("Missing name after slash")
 	InvalidNamePassword = errors.New("Name/Password is not allowed to contain slashes")
+	InvalidValue        = fmt.Errorf("Invalid value")
 )
 
 // Mode - client mode
@@ -73,7 +74,7 @@ func (s *StreamID) FromString(src string) error {
 		for _, kv := range strings.Split(src[len(IDPrefix):], ",") {
 			kv2 := strings.SplitN(kv, "=", 2)
 			if len(kv2) != 2 {
-				return fmt.Errorf("invalid value")
+				return InvalidValue
 			}
 
 			key, value := kv2[0], kv2[1]
