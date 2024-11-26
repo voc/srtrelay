@@ -28,9 +28,11 @@ const (
 
 // Parser object for finding the synchronization point in a MPEGTS stream
 // This works as follows: parse packets until all the following have been fulfilled
-//   1. Parse PAT to get PID->PMT mappings
-//   2. Parse PMTs to Find PID->PES mappings
-//   3. Parse PES to find H.264 SPS+PPS or equivalent
+//
+//  1. Parse PAT to get PID->PMT mappings
+//  2. Parse PMTs to Find PID->PES mappings
+//  3. Parse PES to find H.264 SPS+PPS or equivalent
+//
 // Store the original packets or generate new ones to send to a client
 type Parser struct {
 	init               [][]byte // collected packets to initialize a decoder
