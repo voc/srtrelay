@@ -44,7 +44,7 @@ type StreamID struct {
 	mode     Mode
 	name     string
 	password string
-	// user  string
+	username string
 }
 
 // NewStreamID creates new StreamID
@@ -66,7 +66,7 @@ func NewStreamID(name string, password string, mode Mode) (*StreamID, error) {
 
 // FromString reads a streamid from a string.
 // The accepted old stream id format is <mode>/<password>/<password>. The second slash and password is
-// optional and defaults to empty. The new format is `#!::m=(request|publish),r=(stream-key),u=(user),s=(password)`
+// optional and defaults to empty. The new format is `#!::m=(request|publish),r=(stream-key),u=(username),s=(password)`
 // If error is not nil then StreamID will remain unchanged.
 func (s *StreamID) FromString(src string) error {
 
@@ -81,7 +81,7 @@ func (s *StreamID) FromString(src string) error {
 
 			switch key {
 			case "u":
-			//	s.user = value
+				s.username = value
 
 			case "r":
 				s.name = value
@@ -181,4 +181,8 @@ func (s StreamID) Name() string {
 
 func (s StreamID) Password() string {
 	return s.password
+}
+
+func (s StreamID) Username() string {
+	return s.username
 }
