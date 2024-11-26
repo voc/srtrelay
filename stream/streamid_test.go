@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -13,6 +14,7 @@ func TestParseStreamID(t *testing.T) {
 		wantPass string
 		wantErr  error
 	}{
+		// Old school
 		{"MissingSlash", "s1", 0, "", "", InvalidSlashes},
 		{"InvalidName", "play//s1", 0, "", "", MissingName},
 		{"InvalidMode", "foobar/bla", 0, "", "", InvalidMode},
@@ -22,15 +24,41 @@ func TestParseStreamID(t *testing.T) {
 		{"ValidPlay", "play/s1", ModePlay, "s1", "", nil},
 		{"ValidPublish", "publish/abcdef", ModePublish, "abcdef", "", nil},
 		{"ValidPlaySpace", "play/bla fasel", ModePlay, "bla fasel", "", nil},
+		// New hotness - Bad
+		{"NewInvalidPubEmptyName", "#!::m=publish", ModePublish, "", "", MissingName},
+		{"NewInvalidPlayEmptyName", "#!::m=request", ModePlay, "", "", MissingName},
+		{"NewInvalidPubBadKey", "#!::m=publish,y=bar", ModePublish, "", "", fmt.Errorf("unsupported key '%s'", "y")},
+		{"NewInvalidPlayBadKey", "#!::m=request,x=foo", ModePlay, "", "", fmt.Errorf("unsupported key '%s'", "x")},
+		{"NewInvalidPubNoEquals", "#!::m=publish,r", ModePublish, "abc", "", InvalidValue},
+		{"NewInvalidPlayNoEquals", "#!::m=request,r", ModePlay, "abc", "", InvalidValue},
+		{"NewInvalidPubNoValue", "#!::m=publish,r=", ModePublish, "abc", "", MissingName},
+		{"NewInvalidPlayNoValue", "#!::m=request,s=", ModePlay, "abc", "", MissingName},
+		{"NewInvalidPubBadKey", "#!::m=publish,x=", ModePublish, "abc", "", fmt.Errorf("unsupported key '%s'", "x")},
+		{"NewInvalidPlayBadKey", "#!::m=request,y=", ModePlay, "abc", "", fmt.Errorf("unsupported key '%s'", "y")},
+		// New hotness - Standard
+		{"NewValidNameRequest", "#!::m=publish,r=abc", ModePublish, "abc", "", nil},
+		{"NewValidPlay", "#!::m=request,r=abc", ModePlay, "abc", "", nil},
+		{"NewValidNameRequestRev", "#!::r=abc,m=publish", ModePublish, "abc", "", nil},
+		{"NewValidPlayRev", "#!::r=abc,m=request", ModePlay, "abc", "", nil},
+		{"NewValidPassPub", "#!::m=publish,r=abc,s=bob", ModePublish, "abc", "bob", nil},
+		{"NewValidPassPlay", "#!::m=request,r=abc,s=alice", ModePlay, "abc", "alice", nil},
+		{"NewValidPassPubOrder", "#!::s=bob,m=publish,r=abc123", ModePublish, "abc123", "bob", nil},
+		{"NewValidPassPlayOrder", "#!::m=request,s=alice,r=def", ModePlay, "def", "alice", nil},
+		// New Hotness - Unicode
+		{"NewValidUnicodePub", "#!::m=publish,r=#![äöü,s=bob", ModePublish, "#![äöü", "bob", nil},
+		{"NewValidUnicodePlay", "#!::m=request,r=#![äöü,s=alice", ModePlay, "#![äöü", "alice", nil},
+		{"NewValidUnicodePassPub", "#!::m=publish,s=#![äöü,r=bob", ModePublish, "bob", "#![äöü", nil},
+		{"NewValidUnicodePassPlay", "#!::m=request,s=#![äöü,r=alice", ModePlay, "alice", "#![äöü", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var streamid StreamID
 			err := streamid.FromString(tt.streamID)
-			if err != tt.wantErr {
-				t.Errorf("ParseStreamID() error = %v, wantErr %v", err, tt.wantErr)
-			}
+
 			if err != nil {
+				if err.Error() != tt.wantErr.Error() { // Only really care about str value for this, otherwise: if !errors.Is(err, tt.wantErr) {
+					t.Errorf("ParseStreamID() error = %v, wantErr %v", err, tt.wantErr)
+				}
 				if streamid.String() != "" {
 					t.Error("str should be empty on failed parse")
 				}
