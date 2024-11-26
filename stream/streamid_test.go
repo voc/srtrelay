@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -110,7 +111,7 @@ func TestNewStreamID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			id, err := NewStreamID(tt.argName, tt.argPassword, tt.argMode)
-			if err != tt.wantErr {
+			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("ParseStreamID() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if err != nil {
