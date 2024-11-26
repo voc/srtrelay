@@ -33,7 +33,7 @@ type HTTPAuthConfig struct {
 }
 
 // NewHttpAuth creates an Authenticator with a HTTP backend
-func NewHTTPAuth(config HTTPAuthConfig) *httpAuth {
+func NewHTTPAuth(config HTTPAuthConfig) Authenticator {
 	return &httpAuth{
 		config: config,
 		client: &http.Client{
