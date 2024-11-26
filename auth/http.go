@@ -53,6 +53,7 @@ func (h *httpAuth) Authenticate(streamid stream.StreamID) bool {
 		"call":                 {streamid.Mode().String()},
 		"app":                  {h.config.Application},
 		"name":                 {streamid.Name()},
+		"username":             {streamid.Username()},
 		h.config.PasswordParam: {streamid.Password()},
 	})
 	if err != nil {
