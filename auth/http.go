@@ -32,7 +32,7 @@ type HTTPAuthConfig struct {
 	PasswordParam string   // POST Parameter containing stream passphrase
 }
 
-// NewHttpAuth creates an Authenticator with a HTTP backend
+// NewHTTPAuth creates an Authenticator with a HTTP backend
 func NewHTTPAuth(config HTTPAuthConfig) Authenticator {
 	return &httpAuth{
 		config: config,
