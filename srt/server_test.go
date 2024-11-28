@@ -66,8 +66,8 @@ func (s *testSocket) Read(b []byte) (int, error) {
 	if !ok {
 		return 0, io.EOF
 	}
-	len := copy(b, buf)
-	return len, nil
+	length := copy(b, buf)
+	return length, nil
 }
 
 func (s *testSocket) Write(b []byte) (int, error) {
