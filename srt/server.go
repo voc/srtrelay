@@ -332,8 +332,8 @@ func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
 func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
 	streams := s.relay.GetStatistics()
 	for _, st := range streams {
-		//stream.URL = fmt.Sprintf("srt://%s?streamid=#!::m=request,r=%s", s.config.PublicAddress, stream.Name)
-		st.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.PublicAddress, st.Name)
+		st.URL = fmt.Sprintf("srt://%s?streamid=#!::m=request,r=%s", s.config.PublicAddress, st.Name) // New format
+		//st.URL = fmt.Sprintf("srt://%s?streamid=play/%s", s.config.PublicAddress, st.Name) // Old format
 	}
 	return streams
 }
