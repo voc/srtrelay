@@ -46,7 +46,8 @@ func TestServerImpl_GetStatistics(t *testing.T) {
 	streams := s.GetStatistics()
 
 	expected := []*relay.StreamStatistics{
-		{Name: "s1", URL: "srt://testserver.de:1337?streamid=play/s1", Clients: 2, Created: streams[0].Created},
+		//{Name: "s1", URL: "srt://testserver.de:1337?streamid=play/s1", Clients: 2, Created: streams[0].Created},
+		{Name: "s1", URL: "srt://testserver.de:1337?streamid=#!::m=request,r=s1", Clients: 2, Created: streams[0].Created},
 	}
 	if err := compareStats(streams, expected); err != nil {
 		t.Error(err)
