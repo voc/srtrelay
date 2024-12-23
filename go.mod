@@ -1,12 +1,11 @@
 module github.com/voc/srtrelay
 
-go 1.18
+go 1.21
 
 require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/haivision/srtgo v0.0.0-20230627061225-a70d53fcd618
 	github.com/pelletier/go-toml/v2 v2.2.2
-	google.golang.org/protobuf v1.34.2
 	gotest.tools/v3 v3.5.1
 )
 

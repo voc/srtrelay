@@ -25,7 +25,10 @@ func main() {
 	configFlags := flag.NewFlagSet("config", flag.ContinueOnError)
 	configFlags.SetOutput(io.Discard)
 	configPath := configFlags.String("config", "config.toml", "")
-	configFlags.Parse(os.Args[1:])
+	err := configFlags.Parse(os.Args[1:])
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// parse config
 	conf, err := config.Parse([]string{*configPath, "/etc/srtrelay/config.toml"})

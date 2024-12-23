@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.18-bullseye AS build
+FROM golang:1.23-bullseye AS build
 
 RUN apt-get update && \
     apt-get upgrade -y && \
