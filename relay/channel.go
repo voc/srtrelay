@@ -5,11 +5,36 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/voc/srtrelay/config"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+const relaySubsystem = "relay"
+
+var (
+	activeClients = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: prometheus.BuildFQName(config.MetricsNamespace, relaySubsystem, "active_clients"),
+			Help: "The number of active clients per channel",
+		},
+		[]string{"channel_name"},
+	)
+	channelCreatedTimestamp = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: prometheus.BuildFQName(config.MetricsNamespace, relaySubsystem, "created_timestamp_seconds"),
+			Help: "The UNIX timestamp when the channel was created",
+		},
+		[]string{"channel_name"},
+	)
 )
 
 type UnsubscribeFunc func()
 
 type Channel struct {
+	name       string
 	mutex      sync.Mutex
 	subs       Subs
 	maxPackets uint
@@ -17,6 +42,10 @@ type Channel struct {
 	// statistics
 	clients atomic.Value
 	created time.Time
+
+	// Prometheus metrics.
+	activeClients    prometheus.Gauge
+	createdTimestamp prometheus.Gauge
 }
 type Subs []chan []byte
 
@@ -47,13 +76,18 @@ func (subs Subs) Remove(sub chan []byte) Subs {
 	return subs[:len(subs)-1]     // Truncate slice.
 }
 
-func NewChannel(maxPackets uint) *Channel {
+func NewChannel(name string, maxPackets uint) *Channel {
+	channelActiveClients := activeClients.WithLabelValues(name)
 	ch := &Channel{
-		subs:       make([]chan []byte, 0, 10),
-		maxPackets: maxPackets,
-		created:    time.Now(),
+		name:          name,
+		subs:          make([]chan []byte, 0, 10),
+		maxPackets:    maxPackets,
+		created:       time.Now(),
+		activeClients: channelActiveClients,
 	}
 	ch.clients.Store(0)
+	ch.createdTimestamp = channelCreatedTimestamp.WithLabelValues(name)
+	ch.createdTimestamp.Set(float64(ch.created.UnixNano()) / 1000000.0)
 	return ch
 }
 
@@ -64,6 +98,7 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 	sub := make(chan []byte, ch.maxPackets)
 	ch.subs = append(ch.subs, sub)
 	ch.clients.Store(len(ch.subs))
+	ch.activeClients.Inc()
 
 	var unsub UnsubscribeFunc = func() {
 		ch.mutex.Lock()
@@ -76,6 +111,7 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 
 		ch.subs = ch.subs.Remove(sub)
 		ch.clients.Store(len(ch.subs))
+		ch.activeClients.Dec()
 	}
 	return sub, unsub
 }
@@ -99,6 +135,7 @@ func (ch *Channel) Pub(b []byte) {
 	}
 	for _, sub := range toRemove {
 		ch.subs = ch.subs.Remove(sub)
+		ch.activeClients.Dec()
 	}
 	ch.clients.Store(len(ch.subs))
 }
@@ -111,6 +148,8 @@ func (ch *Channel) Close() {
 		close(ch.subs[i])
 	}
 	ch.subs = nil
+	activeClients.DeleteLabelValues(ch.name)
+	channelCreatedTimestamp.DeleteLabelValues(ch.name)
 }
 
 func (ch *Channel) Stats() Stats {

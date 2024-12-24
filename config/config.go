@@ -12,6 +12,8 @@ import (
 	"github.com/voc/srtrelay/auth"
 )
 
+const MetricsNamespace = "srtrelay"
+
 type Config struct {
 	App  AppConfig
 	Auth AuthConfig
