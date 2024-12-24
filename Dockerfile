@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.23-bullseye AS build
+FROM golang:1.23-bookworm AS build
 
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -24,10 +24,10 @@ ARG TARGETARCH
 RUN GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-w -s" -v -o srtrelay .
 
 # clean start
-FROM debian:bullseye
+FROM debian:bookworm
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install --no-install-recommends -y libssl1.1 && \
+    apt-get install --no-install-recommends -y libssl3 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 RUN useradd -l -m -r srtrelay
