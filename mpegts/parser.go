@@ -28,7 +28,7 @@ const (
 
 // Parser object for finding the synchronization point in a MPEGTS stream
 // This works as follows: parse packets until all the following have been fulfilled
-//
+
 //  1. Parse PAT to get PID->PMT mappings
 //  2. Parse PMTs to Find PID->PES mappings
 //  3. Parse PES to find H.264 SPS+PPS or equivalent
