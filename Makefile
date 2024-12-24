@@ -1,7 +1,6 @@
+.PHONY: srtrelay
 srtrelay:
-	HOME=$$(pwd) git config --global http.sslVerify false
-	mkdir -p $$(pwd)/gopath
-	HOME=$$(pwd) GOPATH=$$(pwd)/gopath go build -o srtrelay
+	go build -o srtrelay
 
 install: srtrelay
 	mkdir -p $$(pwd)/debian/srtrelay/usr/bin
