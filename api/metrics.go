@@ -1,32 +1,30 @@
 package api
 
 import (
+	"github.com/voc/srtrelay/config"
 	"github.com/voc/srtrelay/srt"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const (
-	namespace    = "srtrelay"
-	srtSubsystem = "srt"
-)
+const srtSubsystem = "srt"
 
 var (
 	activeSocketsDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, srtSubsystem, "active_sockets"),
+		prometheus.BuildFQName(config.MetricsNamespace, srtSubsystem, "active_sockets"),
 		"The number of active SRT sockets",
 		nil, nil,
 	)
 
 	// Metrics from: https://pkg.go.dev/github.com/haivision/srtgo#SrtStats
 	pktSentTotalDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, srtSubsystem, "packets_sent_total"),
+		prometheus.BuildFQName(config.MetricsNamespace, srtSubsystem, "packets_sent_total"),
 		"total number of sent data packets, including retransmissions",
 		[]string{"address", "stream_id"}, nil,
 	)
 
 	pktRecvTotalDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, srtSubsystem, "packets_received_total"),
+		prometheus.BuildFQName(config.MetricsNamespace, srtSubsystem, "packets_received_total"),
 		"total number of received packets",
 		[]string{"address", "stream_id"}, nil,
 	)

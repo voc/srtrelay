@@ -54,7 +54,7 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 		return nil, ErrStreamAlreadyExists
 	}
 
-	channel := NewChannel(s.config.BufferSize / s.config.PacketSize)
+	channel := NewChannel(name, s.config.BufferSize/s.config.PacketSize)
 	s.channels[name] = channel
 
 	ch := make(chan []byte)

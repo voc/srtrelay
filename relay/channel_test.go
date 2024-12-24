@@ -6,7 +6,7 @@ import (
 )
 
 func TestChannel_PubSub(t *testing.T) {
-	ch := NewChannel(uint(1316 * 50))
+	ch := NewChannel("test", uint(1316*50))
 
 	// sub
 	out, unsub := ch.Sub()
@@ -33,7 +33,7 @@ func TestChannel_PubSub(t *testing.T) {
 }
 
 func TestChannel_DropOnOverflow(t *testing.T) {
-	ch := NewChannel(uint(1316 * 50))
+	ch := NewChannel("test", uint(1316*50))
 
 	sub, _ := ch.Sub()
 	capacity := cap(sub) + 1
@@ -60,7 +60,7 @@ func TestChannel_DropOnOverflow(t *testing.T) {
 }
 
 func TestChannel_Close(t *testing.T) {
-	ch := NewChannel(0)
+	ch := NewChannel("test", 0)
 	sub1, _ := ch.Sub()
 	_, _ = ch.Sub()
 
@@ -80,7 +80,7 @@ func TestChannel_Close(t *testing.T) {
 }
 
 func TestChannel_Stats(t *testing.T) {
-	ch := NewChannel(0)
+	ch := NewChannel("test", 0)
 	if num := ch.Stats().clients; num != 0 {
 		t.Errorf("Expected 0 clients after create, got %d", num)
 	}
