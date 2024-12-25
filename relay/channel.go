@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/voc/srtrelay/config"
+	"github.com/voc/srtrelay/internal/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -17,14 +17,14 @@ const relaySubsystem = "relay"
 var (
 	activeClients = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: prometheus.BuildFQName(config.MetricsNamespace, relaySubsystem, "active_clients"),
+			Name: prometheus.BuildFQName(metrics.Namespace, relaySubsystem, "active_clients"),
 			Help: "The number of active clients per channel",
 		},
 		[]string{"channel_name"},
 	)
 	channelCreatedTimestamp = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: prometheus.BuildFQName(config.MetricsNamespace, relaySubsystem, "created_timestamp_seconds"),
+			Name: prometheus.BuildFQName(metrics.Namespace, relaySubsystem, "created_timestamp_seconds"),
 			Help: "The UNIX timestamp when the channel was created",
 		},
 		[]string{"channel_name"},

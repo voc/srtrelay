@@ -6,7 +6,26 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/voc/srtrelay/internal/metrics"
 	"github.com/voc/srtrelay/stream"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+var (
+	requestDurations = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace:                   metrics.Namespace,
+			Subsystem:                   "auth",
+			Name:                        "request_duration_seconds",
+			Help:                        "A histogram of auth http request latencies.",
+			Buckets:                     prometheus.DefBuckets,
+			NativeHistogramBucketFactor: 1.1,
+		},
+		[]string{"url", "application"},
+	)
 )
 
 type httpAuth struct {
@@ -33,11 +52,13 @@ type HTTPAuthConfig struct {
 }
 
 // NewHttpAuth creates an Authenticator with a HTTP backend
-func NewHTTPAuth(config HTTPAuthConfig) *httpAuth {
+func NewHTTPAuth(authConfig HTTPAuthConfig) *httpAuth {
+	m := requestDurations.MustCurryWith(prometheus.Labels{"url": authConfig.URL, "application": authConfig.Application})
 	return &httpAuth{
-		config: config,
+		config: authConfig,
 		client: &http.Client{
-			Timeout: time.Duration(config.Timeout),
+			Timeout:   time.Duration(authConfig.Timeout),
+			Transport: promhttp.InstrumentRoundTripperDuration(m, http.DefaultTransport),
 		},
 	}
 }
