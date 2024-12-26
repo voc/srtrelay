@@ -52,7 +52,7 @@ type HTTPAuthConfig struct {
 }
 
 // NewHttpAuth creates an Authenticator with a HTTP backend
-func NewHTTPAuth(authConfig HTTPAuthConfig) *httpAuth {
+func NewHTTPAuth(config HTTPAuthConfig) Authenticator {
 	m := requestDurations.MustCurryWith(prometheus.Labels{"url": authConfig.URL, "application": authConfig.Application})
 	return &httpAuth{
 		config: authConfig,
@@ -74,6 +74,7 @@ func (h *httpAuth) Authenticate(streamid stream.StreamID) bool {
 		"call":                 {streamid.Mode().String()},
 		"app":                  {h.config.Application},
 		"name":                 {streamid.Name()},
+		"username":             {streamid.Username()},
 		h.config.PasswordParam: {streamid.Password()},
 	})
 	if err != nil {

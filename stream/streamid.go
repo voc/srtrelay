@@ -8,11 +8,14 @@ import (
 	"github.com/IGLOU-EU/go-wildcard/v2"
 )
 
+const IDPrefix = "#!::"
+
 var (
 	InvalidSlashes      = errors.New("Invalid number of slashes, must be 1 or 2")
 	InvalidMode         = errors.New("Invalid mode")
 	MissingName         = errors.New("Missing name after slash")
 	InvalidNamePassword = errors.New("Name/Password is not allowed to contain slashes")
+	InvalidValue        = fmt.Errorf("Invalid value")
 )
 
 // Mode - client mode
@@ -41,9 +44,10 @@ type StreamID struct {
 	mode     Mode
 	name     string
 	password string
+	username string
 }
 
-// Creates new StreamID
+// NewStreamID creates new StreamID
 // returns error if mode is invalid.
 // id is nil on error
 func NewStreamID(name string, password string, mode Mode) (*StreamID, error) {
@@ -61,39 +65,77 @@ func NewStreamID(name string, password string, mode Mode) (*StreamID, error) {
 }
 
 // FromString reads a streamid from a string.
-// The accepted stream id format is <mode>/<password>/<password>.
-// The second slash and password is optional and defaults to empty.
+// The accepted old stream id format is <mode>/<password>/<password>. The second slash and password is
+// optional and defaults to empty. The new format is `#!::m=(request|publish),r=(stream-key),u=(username),s=(password)`
 // If error is not nil then StreamID will remain unchanged.
 func (s *StreamID) FromString(src string) error {
-	split := strings.Split(src, "/")
 
-	password := ""
-	if len(split) == 3 {
-		password = split[2]
-	} else if len(split) != 2 {
-		return InvalidSlashes
+	if strings.HasPrefix(src, IDPrefix) {
+		for _, kv := range strings.Split(src[len(IDPrefix):], ",") {
+			kv2 := strings.SplitN(kv, "=", 2)
+			if len(kv2) != 2 {
+				return InvalidValue
+			}
+
+			key, value := kv2[0], kv2[1]
+
+			switch key {
+			case "u":
+				s.username = value
+
+			case "r":
+				s.name = value
+
+			case "h":
+
+			case "s":
+				s.password = value
+
+			case "t":
+
+			case "m":
+				switch value {
+				case "request":
+					s.mode = ModePlay
+
+				case "publish":
+					s.mode = ModePublish
+
+				default:
+					return InvalidMode
+				}
+
+			default:
+				return fmt.Errorf("unsupported key '%s'", key)
+			}
+		}
+	} else {
+		split := strings.Split(src, "/")
+
+		s.password = ""
+		if len(split) == 3 {
+			s.password = split[2]
+		} else if len(split) != 2 {
+			return InvalidSlashes
+		}
+		modeStr := split[0]
+		s.name = split[1]
+
+		switch modeStr {
+		case "play":
+			s.mode = ModePlay
+		case "publish":
+			s.mode = ModePublish
+		default:
+			return InvalidMode
+		}
 	}
-	modeStr := split[0]
-	name := split[1]
 
-	if len(name) == 0 {
+	if len(s.name) == 0 {
 		return MissingName
 	}
 
-	var mode Mode
-	switch modeStr {
-	case "play":
-		mode = ModePlay
-	case "publish":
-		mode = ModePublish
-	default:
-		return InvalidMode
-	}
-
 	s.str = src
-	s.mode = mode
-	s.name = name
-	s.password = password
 	return nil
 }
 
@@ -139,4 +181,8 @@ func (s StreamID) Name() string {
 
 func (s StreamID) Password() string {
 	return s.password
+}
+
+func (s StreamID) Username() string {
+	return s.username
 }

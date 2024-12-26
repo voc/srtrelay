@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"sync"
@@ -49,7 +50,7 @@ func (s *Server) Listen(ctx context.Context) error {
 	go func() {
 		defer s.done.Done()
 		err := serv.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Println(err)
 		}
 	}()
