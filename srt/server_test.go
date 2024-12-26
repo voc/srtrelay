@@ -46,7 +46,7 @@ func TestServerImpl_GetStatistics(t *testing.T) {
 	streams := s.GetStatistics()
 
 	expected := []*relay.StreamStatistics{
-		{Name: "s1", URL: "srt://testserver.de:1337?streamid=play/s1", Clients: 2, Created: streams[0].Created},
+		{Name: "s1", URL: "srt://testserver.de:1337?streamid=#!::m=request,r=s1", Clients: 2, Created: streams[0].Created}, // New Format
 	}
 	if err := compareStats(streams, expected); err != nil {
 		t.Error(err)
@@ -65,8 +65,8 @@ func (s *testSocket) Read(b []byte) (int, error) {
 	if !ok {
 		return 0, io.EOF
 	}
-	len := copy(b, buf)
-	return len, nil
+	length := copy(b, buf)
+	return length, nil
 }
 
 func (s *testSocket) Write(b []byte) (int, error) {
