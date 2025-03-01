@@ -3,7 +3,7 @@ module github.com/voc/srtrelay
 go 1.23
 
 require (
-	github.com/IGLOU-EU/go-wildcard/v2 v2.0.2
+	github.com/IGLOU-EU/go-wildcard/v2 v2.1.0
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/haivision/srtgo v0.0.0-20230627061225-a70d53fcd618
 	github.com/pelletier/go-toml/v2 v2.2.3
