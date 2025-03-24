@@ -105,6 +105,11 @@ func (s *StreamID) FromString(src string) error {
 					return InvalidMode
 				}
 
+			// Ignore keys sent by Blackmagic Atem Mini Pro
+			case "bmd_uuid":
+
+			case "bmd_name":
+
 			default:
 				return fmt.Errorf("unsupported key '%s'", key)
 			}
