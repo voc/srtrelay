@@ -1,5 +1,5 @@
-github.com/IGLOU-EU/go-wildcard/v2 v2.0.2 h1:eQ0nOlEyGfM0NiemevUK55JoNu3IW9R8eRFZMc/apyU=
-github.com/IGLOU-EU/go-wildcard/v2 v2.0.2/go.mod h1:/sUMQ5dk2owR0ZcjRI/4AZ+bUFF5DxGCQrDMNBXUf5o=
+github.com/IGLOU-EU/go-wildcard/v2 v2.1.0 h1:WFqyYAuIYLJ6mHZ4rp/bYXiR4E1IvXW4+zInYWdQBqI=
+github.com/IGLOU-EU/go-wildcard/v2 v2.1.0/go.mod h1:/sUMQ5dk2owR0ZcjRI/4AZ+bUFF5DxGCQrDMNBXUf5o=
 github.com/Showmax/go-fqdn v1.0.0 h1:0rG5IbmVliNT5O19Mfuvna9LL7zlHyRfsSvBPZmF9tM=
 github.com/Showmax/go-fqdn v1.0.0/go.mod h1:SfrFBzmDCtCGrnHhoDjuvFnKsWjEQX/Q9ARZvOrJAko=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
