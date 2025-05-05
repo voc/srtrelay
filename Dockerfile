@@ -21,7 +21,7 @@ RUN apt-get update && \
 COPY . /build
 WORKDIR /build
 ARG TARGETARCH
-RUN GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-w -s" -v -o srtrelay .
+RUN GOOS=linux GOARCH=$TARGETARCH go build -v -o srtrelay .
 
 # clean start
 FROM debian:bookworm
