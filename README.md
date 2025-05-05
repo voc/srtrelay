@@ -6,7 +6,7 @@ Use at your own risk.
 ## Quick start
 Run with docker (**Note:** nightly image not recommended for production)
 ```bash
-docker run ghcr.io/voc/srtrelay/srtrelay:latest
+docker run --rm ghcr.io/voc/srtrelay/srtrelay:latest
 
 # start publisher
 ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:1337?streamid=publish/test
@@ -18,7 +18,7 @@ ffplay -fflags nobuffer srt://localhost:1337?streamid=play/test
 Start docker with custom config. See [config.toml.example](config.toml.example)
 ```bash
 # provide your own config from the local directory
-docker run -v $(pwd)/config.toml:/home/srtrelay/config.toml ghcr.io/voc/srtrelay/srtrelay:latest
+docker run --rm -v $(pwd)/config.toml:/home/srtrelay/config.toml ghcr.io/voc/srtrelay/srtrelay:latest
 ```
 
 ## Run with docker-compose
