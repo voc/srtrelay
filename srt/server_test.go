@@ -3,6 +3,7 @@ package srt
 import (
 	"fmt"
 	"io"
+	"net/netip"
 	"reflect"
 	"sync"
 	"testing"
@@ -31,8 +32,13 @@ func TestServerImpl_GetStatistics(t *testing.T) {
 		PacketSize: 1,
 	})
 	s := &ServerImpl{
-		relay:  r,
-		config: &ServerConfig{Addresses: []string{"127.0.0.1:1337", "[::1]:1337"}, PublicAddress: "testserver.de:1337"},
+		relay: r,
+		config: &ServerConfig{
+			Addresses: []netip.AddrPort{
+				netip.MustParseAddrPort("127.0.0.1:1337"),
+				netip.MustParseAddrPort("[::1]:1337"),
+			}, PublicAddress: "testserver.de:1337",
+		},
 	}
 	if _, err := r.Publish("s1"); err != nil {
 		t.Fatal(err)
