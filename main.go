@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strings"
@@ -40,9 +41,9 @@ func main() {
 	flag.String("config", "config.toml", "path to config file")
 
 	// actual flags, use config as default and storage
-	var addresses string
-	flag.StringVar(&addresses, "addresses", strings.Join(conf.App.Addresses, ","), "relay bind addresses, separated by commata")
-	flag.UintVar(&conf.App.Latency, "latency", conf.App.Latency, "srt protocol latency in ms")
+	var addressStr string
+	flag.StringVar(&addressStr, "addresses", strings.Join(conf.App.Addresses, ","), "relay bind addresses, separated by commata")
+	flag.UintVar(&conf.App.LatencyMs, "latency", conf.App.LatencyMs, "srt protocol latency in ms")
 	flag.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
 		`relay buffer size in bytes, determines maximum delay of a client`)
 	profile := flag.String("pprof", "", "enable profiling server on given address")
@@ -55,7 +56,14 @@ func main() {
 		}
 	}
 
-	conf.App.Addresses = strings.Split(addresses, ",")
+	var addresses []netip.AddrPort
+	for _, addr := range strings.Split(addressStr, ",") {
+		addrs, err := config.ParseAddress(strings.TrimSpace(addr))
+		if err != nil {
+			log.Fatalf("invalid address %s: %v", addr, err)
+		}
+		addresses = append(addresses, addrs...)
+	}
 
 	auth, err := config.GetAuthenticator(conf.Auth)
 	if err != nil {
@@ -64,9 +72,9 @@ func main() {
 
 	serverConfig := srt.Config{
 		Server: srt.ServerConfig{
-			Addresses:     conf.App.Addresses,
+			Addresses:     addresses,
 			PublicAddress: conf.App.PublicAddress,
-			Latency:       conf.App.Latency,
+			LatencyMs:     conf.App.LatencyMs,
 			LossMaxTTL:    conf.App.LossMaxTTL,
 			SyncClients:   conf.App.SyncClients,
 			Auth:          auth,

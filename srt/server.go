@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/netip"
 	"runtime"
 	"strconv"
 	"sync"
@@ -29,9 +30,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Addresses     []string
+	Addresses     []netip.AddrPort
 	PublicAddress string
-	Latency       uint
+	LatencyMs     uint
 	LossMaxTTL    uint
 	Auth          auth.Authenticator
 	SyncClients   bool
@@ -73,33 +74,11 @@ func NewServer(config *Config) *ServerImpl {
 // Listen sets up a SRT socket in listen mode
 func (s *ServerImpl) Listen(ctx context.Context) error {
 	for _, address := range s.config.Addresses {
-		host, portString, err := net.SplitHostPort(address)
+		err := s.listenAt(ctx, address)
 		if err != nil {
 			return err
 		}
-
-		port, err := strconv.ParseUint(portString, 10, 16)
-		if err != nil {
-			return err
-		}
-
-		var addresses []string
-		if len(host) > 0 {
-			addresses, err = net.LookupHost(host)
-			if err != nil {
-				return err
-			}
-		} else {
-			addresses = []string{"::"}
-		}
-
-		for _, address := range addresses {
-			err := s.listenAt(ctx, address, uint16(port))
-			if err != nil {
-				return err
-			}
-			log.Printf("SRT Listening on %s:%d\n", address, port)
-		}
+		log.Printf("SRT Listening on %s\n", address)
 	}
 
 	return nil
@@ -131,20 +110,20 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 	return true
 }
 
-func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) error {
+func (s *ServerImpl) listenAt(ctx context.Context, addr netip.AddrPort) error {
 	options := make(map[string]string)
 	options["blocking"] = "0"
 	options["transtype"] = "live"
-	options["latency"] = strconv.Itoa(int(s.config.Latency))
+	options["latency"] = strconv.Itoa(int(s.config.LatencyMs))
 
-	sck := srtgo.NewSrtSocket(host, port, options)
+	sck := srtgo.NewSrtSocket(addr.Addr().String(), addr.Port(), options)
 	if err := sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL)); err != nil {
 		log.Printf("Error settings lossmaxttl: %s", err)
 	}
 	sck.SetListenCallback(s.listenCallback)
 	err := sck.Listen(s.config.ListenBacklog)
 	if err != nil {
-		return fmt.Errorf("Listen failed for %v:%v : %v", host, port, err)
+		return fmt.Errorf("Listen failed for %q: %s", addr, err)
 	}
 
 	s.done.Add(2)
