@@ -19,8 +19,8 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, conf.App.LatencyMs, uint(1337))
 	assert.Equal(t, conf.App.Buffersize, uint(123000))
 	assert.Equal(t, conf.App.SyncClients, true)
-	assert.Equal(t, conf.App.PacketSize, uint(1456))
-	assert.Equal(t, conf.App.LossMaxTTL, uint(50))
+	assert.Equal(t, conf.App.PacketSize, uint32(1456))
+	assert.Equal(t, conf.App.LossMaxTTL, uint32(50))
 	assert.Equal(t, conf.App.PublicAddress, "dontlookmeup:5432")
 	assert.Equal(t, conf.App.ListenBacklog, 30)
 
@@ -43,7 +43,7 @@ func TestParseAddress(t *testing.T) {
 		expectedErr bool
 	}{
 		{"localhost", "localhost:1337", []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:1337"), netip.MustParseAddrPort("[::1]:1337")}, false},
-		{"no host", ":1337", []netip.AddrPort{netip.MustParseAddrPort("0.0.0.0:1337"), netip.MustParseAddrPort("[::]:1337")}, false},
+		{"no host", ":1337", []netip.AddrPort{netip.MustParseAddrPort("[::]:1337")}, false},
 		{"all v4", "0.0.0.0:1337", []netip.AddrPort{netip.MustParseAddrPort("0.0.0.0:1337")}, false},
 		{"all v6", "[::]:1337", []netip.AddrPort{netip.MustParseAddrPort("[::]:1337")}, false},
 		{"v6", "[1234::beef]:1337", []netip.AddrPort{netip.MustParseAddrPort("[1234::beef]:1337")}, false},

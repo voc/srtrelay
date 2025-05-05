@@ -16,7 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/haivision/srtgo"
 	"github.com/voc/srtrelay/api"
 	"github.com/voc/srtrelay/config"
 	"github.com/voc/srtrelay/relay"
@@ -79,12 +78,13 @@ func main() {
 			LatencyMs:     conf.App.LatencyMs,
 			LossMaxTTL:    conf.App.LossMaxTTL,
 			SyncClients:   conf.App.SyncClients,
+			PacketSize:    conf.App.PacketSize,
 			Auth:          auth,
 			ListenBacklog: conf.App.ListenBacklog,
 		},
 		Relay: relay.RelayConfig{
 			BufferSize: conf.App.Buffersize,
-			PacketSize: conf.App.PacketSize,
+			PacketSize: uint(conf.App.PacketSize),
 		},
 	}
 
@@ -93,7 +93,6 @@ func main() {
 	handleSignal(ctx, cancel)
 
 	// create server
-	srtgo.InitSRT()
 	srtServer := srt.NewServer(&serverConfig)
 	err = srtServer.Listen(ctx)
 	if err != nil {
@@ -127,7 +126,6 @@ func main() {
 	case <-time.After(time.Second * 2):
 		slog.Warn("Graceful shutdown timed out, forcing exit")
 	}
-	srtgo.CleanupSRT()
 }
 
 func enablePprof(addr string) error {

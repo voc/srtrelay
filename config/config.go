@@ -18,9 +18,10 @@ import (
 const MetricsNamespace = "srtrelay"
 
 type Config struct {
-	App  AppConfig  `toml:"app"`
-	Auth AuthConfig `toml:"auth"`
-	API  APIConfig  `toml:"api"`
+	App     AppConfig     `toml:"app"`
+	Auth    AuthConfig    `toml:"auth"`
+	API     APIConfig     `toml:"api"`
+	Profile ProfileConfig `toml:"profile"`
 }
 
 type AppConfig struct {
@@ -43,10 +44,10 @@ type AppConfig struct {
 	SyncClients bool `toml:"syncClients"`
 
 	// The value up to which the Reorder Tolerance may grow, 0 by default
-	LossMaxTTL uint `toml:"lossMaxTTL"`
+	LossMaxTTL uint32 `toml:"lossMaxTTL"`
 
 	// max size of packets in bytes, default is 1316
-	PacketSize uint `toml:"packetSize"`
+	PacketSize uint32 `toml:"packetSize"`
 
 	// max number of pending connections, default is 10
 	ListenBacklog int `toml:"listenBacklog"`
@@ -62,6 +63,10 @@ type APIConfig struct {
 	Enabled bool   `toml:"enabled"`
 	Address string `toml:"address"`
 	Port    uint   `toml:"port"`
+}
+
+type ProfileConfig struct {
+	Address string `toml:"address"`
 }
 
 // GetAuthenticator creates a new authenticator according to AuthConfig
@@ -97,13 +102,10 @@ func Parse(paths []string) (*Config, error) {
 	// set defaults
 	config := Config{
 		App: AppConfig{
-			Addresses:     []string{"localhost:1337"},
-			LatencyMs:     200,
-			LossMaxTTL:    0,
-			Buffersize:    384000, // 1s @ 3Mbits/s
-			SyncClients:   false,
-			PacketSize:    1316, // max is 1456
-			ListenBacklog: 10,
+			Addresses:  []string{"localhost:1337"},
+			LatencyMs:  200,
+			Buffersize: 384000, // 1s @ 3Mbits/s
+			PacketSize: 1316,   // max is 1456
 		},
 		Auth: AuthConfig{
 			Type: "static",
