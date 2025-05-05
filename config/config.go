@@ -3,7 +3,10 @@ package config
 import (
 	"fmt"
 	"log"
+	"net"
+	"net/netip"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,10 +24,17 @@ type Config struct {
 }
 
 type AppConfig struct {
-	Address       string
-	Addresses     []string
+	// Deprecated, use Addresses
+	DeprecatedAddress string
+
+	// List of addresses to bind to
+	Addresses []string
+
+	// Address to use for API responses
 	PublicAddress string
-	Latency       uint
+
+	// SRT LatencyMs in milliseconds
+	LatencyMs uint
 
 	// total buffer size in bytes, determines maximum delay of a client
 	Buffersize uint
@@ -88,7 +98,7 @@ func Parse(paths []string) (*Config, error) {
 	config := Config{
 		App: AppConfig{
 			Addresses:     []string{"localhost:1337"},
-			Latency:       200,
+			LatencyMs:     200,
 			LossMaxTTL:    0,
 			Buffersize:    384000, // 1s @ 3Mbits/s
 			SyncClients:   false,
@@ -142,9 +152,9 @@ func Parse(paths []string) (*Config, error) {
 	}
 
 	// support old config files
-	if config.App.Address != "" {
+	if config.App.DeprecatedAddress != "" {
 		log.Println("Note: config option address is deprecated, please use addresses")
-		config.App.Addresses = []string{config.App.Address}
+		config.App.Addresses = []string{config.App.DeprecatedAddress}
 	}
 
 	// guess public address if not set
@@ -158,4 +168,48 @@ func Parse(paths []string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+var (
+	ipv4Loopback = netip.AddrFrom4([4]byte{127, 0, 0, 1})
+	ipv6Loopback = netip.IPv6Loopback()
+)
+
+func ParseAddress(addr string) ([]netip.AddrPort, error) {
+	// parse address
+	addrStr, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		if _, ok := err.(*net.AddrError); ok {
+			return nil, fmt.Errorf("invalid address: %q", addr)
+		}
+		return nil, err
+	}
+
+	// parse port
+	portInt, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		return nil, fmt.Errorf("invalid port: %q", portStr)
+	}
+
+	if addrStr == "localhost" {
+		return []netip.AddrPort{
+			netip.AddrPortFrom(ipv4Loopback, uint16(portInt)),
+			netip.AddrPortFrom(ipv6Loopback, uint16(portInt)),
+		}, nil
+	}
+
+	// listen on both IPv4 and IPv6 if address is empty
+	// (e.g. ":1337")
+	if addrStr == "" {
+		return []netip.AddrPort{
+			netip.AddrPortFrom(netip.IPv4Unspecified(), uint16(portInt)),
+			netip.AddrPortFrom(netip.IPv6Unspecified(), uint16(portInt)),
+		}, nil
+	}
+
+	addrPort, err := netip.ParseAddrPort(addr)
+	if err != nil {
+		return []netip.AddrPort{}, err
+	}
+	return []netip.AddrPort{addrPort}, nil
 }

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"net/netip"
+	"slices"
 	"testing"
 	"time"
 
@@ -14,7 +16,7 @@ func TestConfig(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, conf.App.Addresses[0], "127.0.0.1:5432")
-	assert.Equal(t, conf.App.Latency, uint(1337))
+	assert.Equal(t, conf.App.LatencyMs, uint(1337))
 	assert.Equal(t, conf.App.Buffersize, uint(123000))
 	assert.Equal(t, conf.App.SyncClients, true)
 	assert.Equal(t, conf.App.PacketSize, uint(1456))
@@ -31,4 +33,32 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, conf.Auth.HTTP.Timeout, auth.Duration(time.Second*5))
 	assert.Equal(t, conf.Auth.HTTP.Application, "foo")
 	assert.Equal(t, conf.Auth.HTTP.PasswordParam, "pass")
+}
+
+func TestParseAddress(t *testing.T) {
+	tests := []struct {
+		name        string
+		addr        string
+		expected    []netip.AddrPort
+		expectedErr bool
+	}{
+		{"localhost", "localhost:1337", []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:1337"), netip.MustParseAddrPort("[::1]:1337")}, false},
+		{"no host", ":1337", []netip.AddrPort{netip.MustParseAddrPort("0.0.0.0:1337"), netip.MustParseAddrPort("[::]:1337")}, false},
+		{"all v4", "0.0.0.0:1337", []netip.AddrPort{netip.MustParseAddrPort("0.0.0.0:1337")}, false},
+		{"all v6", "[::]:1337", []netip.AddrPort{netip.MustParseAddrPort("[::]:1337")}, false},
+		{"v6", "[1234::beef]:1337", []netip.AddrPort{netip.MustParseAddrPort("[1234::beef]:1337")}, false},
+		{"invalid", "localhost:abc", nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseAddress(tt.addr)
+			assert.Equal(t, err != nil, tt.expectedErr)
+			ok := slices.EqualFunc(got, tt.expected, func(a, b netip.AddrPort) bool {
+				return a.String() == b.String()
+			})
+			if !ok {
+				t.Fatalf("got = %v, want %v", got, tt.expected)
+			}
+		})
+	}
 }
