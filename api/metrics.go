@@ -16,7 +16,6 @@ var (
 		nil, nil,
 	)
 
-	// Metrics from: https://pkg.go.dev/github.com/haivision/srtgo#SrtStats
 	pktSentTotalDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(metrics.Namespace, srtSubsystem, "sent_packets_total"),
 		"total number of sent data packets, including retransmissions",
@@ -140,10 +139,10 @@ var (
 
 // Exporter collects metrics. It implements prometheus.Collector.
 type Exporter struct {
-	server srt.Server
+	server *srt.Server
 }
 
-func NewExporter(s srt.Server) *Exporter {
+func NewExporter(s *srt.Server) *Exporter {
 	e := Exporter{server: s}
 	return &e
 }
@@ -178,25 +177,25 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	stats := e.server.GetSocketStatistics()
 	ch <- prometheus.MustNewConstMetric(activeSocketsDesc, prometheus.GaugeValue, float64(len(stats)))
 	for _, stat := range stats {
-		ch <- prometheus.MustNewConstMetric(pktSentTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSentTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktRecvTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktSndLossTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSndLossTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktRcvLossTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRcvLossTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktRetransTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRetransTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktSentACKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSentACKTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktRecvACKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvACKTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktSentNAKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSentNAKTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktRecvNAKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvNAKTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(sndDurationTotalDesc, prometheus.CounterValue, float64(stat.Stats.UsSndDurationTotal)/1_000_000.0, stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktSndDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSndDropTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktRcvDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRcvDropTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(pktRcvUndecryptTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRcvUndecryptTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(byteSentTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteSentTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(byteRecvTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRecvTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(byteRcvLossTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRcvLossTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(byteRetransTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRetransTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(byteSndDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteSndDropTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(byteRcvDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRcvDropTotal), stat.Address, stat.StreamID)
-		ch <- prometheus.MustNewConstMetric(byteRcvUndecryptTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRcvUndecryptTotal), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktSentTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSent), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktRecvTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecv), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktSndLossTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSendLoss), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktRcvLossTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvLoss), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktRetransTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRetrans), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktSentACKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSentACK), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktRecvACKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvACK), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktSentNAKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSentNAK), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktRecvNAKTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvNAK), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(sndDurationTotalDesc, prometheus.CounterValue, float64(stat.Stats.UsSndDuration)/1_000_000.0, stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktSndDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktSendDrop), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktRcvDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvDrop), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(pktRcvUndecryptTotalDesc, prometheus.CounterValue, float64(stat.Stats.PktRecvUndecrypt), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(byteSentTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteSent), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(byteRecvTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRecv), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(byteRcvLossTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRecvLoss), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(byteRetransTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRetrans), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(byteSndDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteSendDrop), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(byteRcvDropTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRecvDrop), stat.Address, stat.StreamID)
+		ch <- prometheus.MustNewConstMetric(byteRcvUndecryptTotalDesc, prometheus.CounterValue, float64(stat.Stats.ByteRecvUndecrypt), stat.Address, stat.StreamID)
 	}
 }

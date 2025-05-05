@@ -43,10 +43,10 @@ type AppConfig struct {
 	SyncClients bool `toml:"syncClients"`
 
 	// The value up to which the Reorder Tolerance may grow, 0 by default
-	LossMaxTTL uint `toml:"lossMaxTTL"`
+	LossMaxTTL uint32 `toml:"lossMaxTTL"`
 
 	// max size of packets in bytes, default is 1316
-	PacketSize uint `toml:"packetSize"`
+	PacketSize uint32 `toml:"packetSize"`
 
 	// max number of pending connections, default is 10
 	ListenBacklog int `toml:"listenBacklog"`
