@@ -19,11 +19,11 @@ import (
 // Server serves HTTP API requests
 type Server struct {
 	conf      config.APIConfig
-	srtServer srt.Server
+	srtServer *srt.Server
 	done      sync.WaitGroup
 }
 
-func NewServer(conf config.APIConfig, srtServer srt.Server) *Server {
+func NewServer(conf config.APIConfig, srtServer *srt.Server) *Server {
 	prometheus.MustRegister(NewExporter(srtServer))
 	log.Println("Registered server metrics")
 	return &Server{

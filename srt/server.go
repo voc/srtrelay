@@ -1,23 +1,20 @@
 package srt
 
-// #cgo LDFLAGS: -lsrt
-// #include <srt/srt.h>
-import "C"
-
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/netip"
 	"runtime"
-	"strconv"
 	"sync"
 	"time"
 
-	"github.com/haivision/srtgo"
+	gosrt "github.com/datarhei/gosrt"
+
 	"github.com/voc/srtrelay/auth"
 	"github.com/voc/srtrelay/format"
 	"github.com/voc/srtrelay/relay"
@@ -33,23 +30,14 @@ type ServerConfig struct {
 	Addresses     []netip.AddrPort
 	PublicAddress string
 	LatencyMs     uint
-	LossMaxTTL    uint
+	LossMaxTTL    uint32
+	PacketSize    uint32
 	Auth          auth.Authenticator
 	SyncClients   bool
 	ListenBacklog int
 }
 
-// Server is an interface for a srt relay server
-type Server interface {
-	Listen(context.Context) error
-	Wait()
-	Handle(context.Context, *srtgo.SrtSocket, *net.UDPAddr)
-	GetStatistics() []*relay.StreamStatistics
-	GetSocketStatistics() []*SocketStatistics
-}
-
-// ServerImpl implements the Server interface
-type ServerImpl struct {
+type Server struct {
 	config *ServerConfig
 	relay  relay.Relay
 
@@ -61,9 +49,9 @@ type ServerImpl struct {
 }
 
 // NewServer creates a server
-func NewServer(config *Config) *ServerImpl {
+func NewServer(config *Config) *Server {
 	r := relay.NewRelay(&config.Relay)
-	return &ServerImpl{
+	return &Server{
 		relay:  r,
 		config: &config.Server,
 		conns:  make(map[*srtConn]bool),
@@ -72,7 +60,7 @@ func NewServer(config *Config) *ServerImpl {
 }
 
 // Listen sets up a SRT socket in listen mode
-func (s *ServerImpl) Listen(ctx context.Context) error {
+func (s *Server) Listen(ctx context.Context) error {
 	for _, address := range s.config.Addresses {
 		err := s.listenAt(ctx, address)
 		if err != nil {
@@ -85,45 +73,18 @@ func (s *ServerImpl) Listen(ctx context.Context) error {
 }
 
 // Wait blocks until listening sockets have been closed
-func (s *ServerImpl) Wait() {
+func (s *Server) Wait() {
 	s.done.Wait()
 }
 
-func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *net.UDPAddr, idstring string) bool {
-	var streamid stream.StreamID
-
-	// Parse stream id
-	if err := streamid.FromString(idstring); err != nil {
-		log.Println(err)
-		return false
-	}
-
-	// Check authentication
-	if !s.config.Auth.Authenticate(streamid) {
-		log.Printf("%s - Stream '%s' access denied\n", addr, streamid)
-		if err := socket.SetRejectReason(srtgo.RejectionReasonUnauthorized); err != nil {
-			log.Printf("Error rejecting stream: %s", err)
-		}
-		return false
-	}
-
-	return true
-}
-
-func (s *ServerImpl) listenAt(ctx context.Context, addr netip.AddrPort) error {
-	options := make(map[string]string)
-	options["blocking"] = "0"
-	options["transtype"] = "live"
-	options["latency"] = strconv.Itoa(int(s.config.LatencyMs))
-	fmt.Println("addr", addr.Addr().String())
-	sck := srtgo.NewSrtSocket(addr.Addr().String(), addr.Port(), options)
-	if err := sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL)); err != nil {
-		log.Printf("Error settings lossmaxttl: %s", err)
-	}
-	sck.SetListenCallback(s.listenCallback)
-	err := sck.Listen(s.config.ListenBacklog)
+func (s *Server) listenAt(ctx context.Context, addr netip.AddrPort) error {
+	conf := gosrt.DefaultConfig()
+	conf.Latency = time.Duration(s.config.LatencyMs) * time.Millisecond
+	conf.PayloadSize = s.config.PacketSize
+	conf.LossMaxTTL = s.config.LossMaxTTL
+	ln, err := gosrt.Listen("srt", addr.String(), conf)
 	if err != nil {
-		return fmt.Errorf("Listen failed for %q: %s", addr, err)
+		return err
 	}
 
 	s.done.Add(2)
@@ -131,94 +92,112 @@ func (s *ServerImpl) listenAt(ctx context.Context, addr netip.AddrPort) error {
 	go func() {
 		defer s.done.Done()
 		<-ctx.Done()
-		sck.Close()
+		ln.Close()
 	}()
 
 	// accept loop
 	go func() {
 		defer s.done.Done()
 		for {
-			sck.SetReadDeadline(time.Now().Add(time.Millisecond * 300))
-			sock, addr, err := sck.Accept()
+			req, err := ln.Accept2()
 			if err != nil {
-				if errors.Is(err, &srtgo.SrtEpollTimeout{}) {
-					continue
-				}
-				// exit silently if context closed
-				select {
-				case <-ctx.Done():
+				// exit silently on close
+				if errors.Is(err, gosrt.ErrListenerClosed) {
 					return
-				default:
 				}
+				log.Println("accept failed", err)
+			}
+
+			if reason, ok := s.shouldAccept(req); !ok {
+				req.Reject(reason)
+				continue
+			}
+
+			conn, err := req.Accept()
+			if err != nil {
 				log.Println("accept failed", err)
 				continue
 			}
-			go s.Handle(ctx, sock, addr)
+			go s.Handle(ctx, conn)
 		}
 	}()
 	return nil
 }
 
+func (s *Server) shouldAccept(req gosrt.ConnRequest) (gosrt.RejectionReason, bool) {
+	var streamid stream.StreamID
+
+	// Parse stream id
+	if err := streamid.FromString(req.StreamId()); err != nil {
+		log.Println(err)
+		return gosrt.REJ_PEER, false
+	}
+
+	// Check authentication
+	if !s.config.Auth.Authenticate(streamid) {
+		log.Printf("%s - Stream '%s' access denied\n", req.RemoteAddr(), streamid)
+		return gosrt.REJX_UNAUTHORIZED, false
+	}
+
+	return 0, true
+}
+
 // SRTConn wraps an srtsocket with additional state
 type srtConn struct {
+	log      *slog.Logger
 	socket   relaySocket
-	address  string
 	streamid *stream.StreamID
 }
 
 type relaySocket interface {
 	io.Reader
 	io.Writer
-	Close()
-	Stats() (*srtgo.SrtStats, error)
+	RemoteAddr() net.Addr
+	Close() error
+	Stats(*gosrt.Statistics)
 }
 
 // Handle srt client connection
-func (s *ServerImpl) Handle(ctx context.Context, sock *srtgo.SrtSocket, addr *net.UDPAddr) {
+func (s *Server) Handle(ctx context.Context, conn gosrt.Conn) {
 	var streamid stream.StreamID
-	defer sock.Close()
-
-	idstring, err := sock.GetSockOptString(C.SRTO_STREAMID)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	defer conn.Close()
 
 	// Parse stream id
-	if err := streamid.FromString(idstring); err != nil {
+	if err := streamid.FromString(conn.StreamId()); err != nil {
 		log.Println(err)
 		return
 	}
 
-	conn := &srtConn{
-		socket:   sock,
-		address:  addr.String(),
+	myconn := &srtConn{
+		log:      slog.With("addr", conn.RemoteAddr(), "stream", streamid.Name()),
+		socket:   conn,
 		streamid: &streamid,
 	}
 
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s.registerForStats(subctx, conn)
+	s.registerForStats(subctx, myconn)
 
+	var err error
 	switch streamid.Mode() {
 	case stream.ModePlay:
-		err = s.play(conn)
+		err = s.play(myconn)
 	case stream.ModePublish:
-		err = s.publish(conn)
+		err = s.publish(myconn)
 	}
 	if err != nil {
-		log.Printf("%s - %s - %v", conn.address, conn.streamid.Name(), err)
+		myconn.log.Info("closing", "error", err)
 	}
 }
 
 // play a stream from the server
-func (s *ServerImpl) play(conn *srtConn) error {
+func (s *Server) play(conn *srtConn) error {
 	sub, unsubscribe, err := s.relay.Subscribe(conn.streamid.Name())
 	if err != nil {
 		return err
 	}
 	defer unsubscribe()
-	log.Printf("%s - play %s\n", conn.address, conn.streamid.Name())
+	conn.log.Info("play")
 
 	demux := format.NewDemuxer()
 	playing := !s.config.SyncClients
@@ -227,12 +206,12 @@ func (s *ServerImpl) play(conn *srtConn) error {
 
 		buffered := len(sub)
 		if buffered > cap(sub)/2 {
-			log.Printf("%s - %s - %d packets late in buffer\n", conn.address, conn.streamid.Name(), len(sub))
+			conn.log.Warn(fmt.Sprintf("%d packets late in buffer", len(sub)))
 		}
 
 		// Upstream closed, drop connection
 		if !ok {
-			log.Printf("%s - %s dropped", conn.address, conn.streamid.Name())
+			conn.log.Info("upstream closed, dropping")
 			return nil
 		}
 
@@ -264,13 +243,13 @@ func (s *ServerImpl) play(conn *srtConn) error {
 }
 
 // publish a stream to the server
-func (s *ServerImpl) publish(conn *srtConn) error {
+func (s *Server) publish(conn *srtConn) error {
 	pub, err := s.relay.Publish(conn.streamid.Name())
 	if err != nil {
 		return err
 	}
 	defer close(pub)
-	log.Printf("%s - publish %s\n", conn.address, conn.streamid.Name())
+	conn.log.Info("publish")
 
 	for {
 		// Get buffer from pool and return sometime after use
@@ -292,7 +271,7 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 	}
 }
 
-func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
+func (s *Server) registerForStats(ctx context.Context, conn *srtConn) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -308,7 +287,7 @@ func (s *ServerImpl) registerForStats(ctx context.Context, conn *srtConn) {
 	}()
 }
 
-func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
+func (s *Server) GetStatistics() []*relay.StreamStatistics {
 	streams := s.relay.GetStatistics()
 	for _, st := range streams {
 		st.URL = fmt.Sprintf("srt://%s?streamid=#!::m=request,r=%s", s.config.PublicAddress, st.Name) // New format
@@ -317,27 +296,23 @@ func (s *ServerImpl) GetStatistics() []*relay.StreamStatistics {
 }
 
 type SocketStatistics struct {
-	Address  string          `json:"address"`
-	StreamID string          `json:"stream_id"`
-	Stats    *srtgo.SrtStats `json:"stats"`
+	Address  string                      `json:"address"`
+	StreamID string                      `json:"stream_id"`
+	Stats    gosrt.StatisticsAccumulated `json:"stats"`
 }
 
-func (s *ServerImpl) GetSocketStatistics() []*SocketStatistics {
-	statistics := make([]*SocketStatistics, 0)
-
+func (s *Server) GetSocketStatistics() []*SocketStatistics {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	var stats gosrt.Statistics
+	statistics := make([]*SocketStatistics, 0, len(s.conns))
 	for conn := range s.conns {
-		srtStats, err := conn.socket.Stats()
-		if err != nil {
-			log.Printf("%s - error getting stats %s\n", conn.address, err)
-			continue
-		}
+		conn.socket.Stats(&stats)
 		statistics = append(statistics, &SocketStatistics{
-			Address:  conn.address,
+			Address:  conn.socket.RemoteAddr().String(),
 			StreamID: conn.streamid.String(),
-			Stats:    srtStats,
+			Stats:    stats.Accumulated,
 		})
 	}
 

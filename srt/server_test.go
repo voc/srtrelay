@@ -3,13 +3,15 @@ package srt
 import (
 	"fmt"
 	"io"
+	"log/slog"
+	"net"
 	"net/netip"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/haivision/srtgo"
+	gosrt "github.com/datarhei/gosrt"
 	"github.com/voc/srtrelay/relay"
 	"github.com/voc/srtrelay/stream"
 )
@@ -31,7 +33,7 @@ func TestServerImpl_GetStatistics(t *testing.T) {
 		BufferSize: 1,
 		PacketSize: 1,
 	})
-	s := &ServerImpl{
+	s := &Server{
 		relay: r,
 		config: &ServerConfig{
 			Addresses: []netip.AddrPort{
@@ -80,10 +82,13 @@ func (s *testSocket) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (s *testSocket) Close() {}
+func (s *testSocket) Close() error { return nil }
 
-func (s *testSocket) Stats() (*srtgo.SrtStats, error) {
-	return &srtgo.SrtStats{}, nil
+func (s *testSocket) Stats(*gosrt.Statistics) {
+}
+
+func (s *testSocket) RemoteAddr() net.Addr {
+	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1234}
 }
 
 func TestPublish(t *testing.T) {
@@ -106,9 +111,9 @@ func TestPublish(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		err = s.publish(&srtConn{
+			log:      slog.Default(),
 			socket:   &rd,
 			streamid: id,
-			address:  "publisher:1234",
 		})
 		if err != io.EOF {
 			t.Error("publisher error", err)
@@ -120,9 +125,9 @@ func TestPublish(t *testing.T) {
 		defer wg.Done()
 		time.Sleep(50 * time.Millisecond)
 		err := s.play(&srtConn{
+			log:      slog.Default(),
 			socket:   &wr,
 			streamid: id,
-			address:  "player:1234",
 		})
 		if err != nil {
 			t.Error("player error", err)
