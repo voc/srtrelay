@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.23-bookworm AS build
+FROM golang:1.24-bookworm AS build
 
 RUN apt-get update && \
     apt-get upgrade -y && \
