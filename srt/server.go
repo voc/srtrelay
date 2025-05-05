@@ -130,7 +130,7 @@ func (s *ServerImpl) listenAt(ctx context.Context, addr netip.AddrPort) error {
 	options["blocking"] = "1"
 	options["transtype"] = "live"
 	options["latency"] = strconv.Itoa(int(s.config.LatencyMs))
-
+	fmt.Println("addr", addr.Addr().String())
 	sck := srtgo.NewSrtSocket(addr.Addr().String(), addr.Port(), options)
 	if err := sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, int(s.config.LossMaxTTL)); err != nil {
 		log.Printf("Error settings lossmaxttl: %s", err)
