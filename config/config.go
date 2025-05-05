@@ -18,50 +18,50 @@ import (
 const MetricsNamespace = "srtrelay"
 
 type Config struct {
-	App  AppConfig
-	Auth AuthConfig
-	API  APIConfig
+	App  AppConfig  `toml:"app"`
+	Auth AuthConfig `toml:"auth"`
+	API  APIConfig  `toml:"api"`
 }
 
 type AppConfig struct {
 	// Deprecated, use Addresses
-	DeprecatedAddress string
+	DeprecatedAddress string `toml:"address"`
 
 	// List of addresses to bind to
-	Addresses []string
+	Addresses []string `toml:"addresses"`
 
 	// Address to use for API responses
-	PublicAddress string
+	PublicAddress string `toml:"publicAddress"`
 
 	// SRT LatencyMs in milliseconds
-	LatencyMs uint
+	LatencyMs uint `toml:"latency"`
 
 	// total buffer size in bytes, determines maximum delay of a client
-	Buffersize uint
+	Buffersize uint `toml:"buffersize"`
 
 	// Whether to sync clients to GOP start
-	SyncClients bool
+	SyncClients bool `toml:"syncClients"`
 
 	// The value up to which the Reorder Tolerance may grow, 0 by default
-	LossMaxTTL uint
+	LossMaxTTL uint `toml:"lossMaxTTL"`
 
 	// max size of packets in bytes, default is 1316
-	PacketSize uint
+	PacketSize uint `toml:"packetSize"`
 
 	// max number of pending connections, default is 10
-	ListenBacklog int
+	ListenBacklog int `toml:"listenBacklog"`
 }
 
 type AuthConfig struct {
-	Type   string
-	Static auth.StaticAuthConfig
-	HTTP   auth.HTTPAuthConfig
+	Type   string                `toml:"type"`
+	Static auth.StaticAuthConfig `toml:"static"`
+	HTTP   auth.HTTPAuthConfig   `toml:"http"`
 }
 
 type APIConfig struct {
-	Enabled bool
-	Address string
-	Port    uint
+	Enabled bool   `toml:"enabled"`
+	Address string `toml:"address"`
+	Port    uint   `toml:"port"`
 }
 
 // GetAuthenticator creates a new authenticator according to AuthConfig
@@ -202,14 +202,13 @@ func ParseAddress(addr string) ([]netip.AddrPort, error) {
 	// (e.g. ":1337")
 	if addrStr == "" {
 		return []netip.AddrPort{
-			netip.AddrPortFrom(netip.IPv4Unspecified(), uint16(portInt)),
 			netip.AddrPortFrom(netip.IPv6Unspecified(), uint16(portInt)),
 		}, nil
 	}
 
 	addrPort, err := netip.ParseAddrPort(addr)
 	if err != nil {
-		return []netip.AddrPort{}, err
+		return nil, err
 	}
 	return []netip.AddrPort{addrPort}, nil
 }
