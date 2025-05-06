@@ -2,7 +2,6 @@ package relay
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 )
@@ -17,12 +16,6 @@ type RelayConfig struct {
 	PacketSize uint
 }
 
-type Relay interface {
-	Publish(string) (chan<- []byte, error)
-	Subscribe(string) (<-chan []byte, UnsubscribeFunc, error)
-	GetStatistics() []*StreamStatistics
-}
-
 type StreamStatistics struct {
 	Name    string    `json:"name"`
 	URL     string    `json:"url"`
@@ -30,23 +23,29 @@ type StreamStatistics struct {
 	Created time.Time `json:"created"`
 }
 
-// RelayImpl represents a multi-channel stream relay
-type RelayImpl struct {
+// Relay represents a multi-channel stream relay
+type Relay struct {
 	mutex    sync.Mutex
 	channels map[string]*Channel
 	config   *RelayConfig
 }
 
 // NewRelay creates a relay
-func NewRelay(config *RelayConfig) Relay {
-	return &RelayImpl{
+func NewRelay(config *RelayConfig) *Relay {
+	if config.BufferSize == 0 {
+		config.BufferSize = 384000 // 1s @ 3Mbits/s
+	}
+	if config.PacketSize == 0 {
+		config.PacketSize = 1316 // default packet size
+	}
+	return &Relay{
 		channels: make(map[string]*Channel),
 		config:   config,
 	}
 }
 
 // Publish claims a stream name for publishing
-func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
+func (s *Relay) Publish(name string) (chan<- []byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -68,7 +67,6 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 			if !ok {
 				// Need a lock on the map first to stop new subscribers
 				s.mutex.Lock()
-				log.Println("Unpublished stream", name)
 				delete(s.channels, name)
 				channel.Close()
 				s.mutex.Unlock()
@@ -82,8 +80,30 @@ func (s *RelayImpl) Publish(name string) (chan<- []byte, error) {
 	return ch, nil
 }
 
+type Subscriber struct {
+	ch         chan []byte
+	chanClosed <-chan struct{}
+}
+
+var (
+	errUpstreamClosed = errors.New("upstream closed")
+	errLateSubscriber = errors.New("late subscriber")
+)
+
+func (s *Subscriber) Read() ([]byte, error) {
+	select {
+	case <-s.chanClosed:
+		return nil, errUpstreamClosed
+	case buf, ok := <-s.ch:
+		if !ok {
+			return nil, errLateSubscriber
+		}
+		return buf, nil
+	}
+}
+
 // Subscribe subscribes to a stream by name
-func (s *RelayImpl) Subscribe(name string) (<-chan []byte, UnsubscribeFunc, error) {
+func (s *Relay) Subscribe(name string) (*Subscriber, UnsubscribeFunc, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	channel, ok := s.channels[name]
@@ -94,7 +114,7 @@ func (s *RelayImpl) Subscribe(name string) (<-chan []byte, UnsubscribeFunc, erro
 	return ch, unsub, nil
 }
 
-func (s *RelayImpl) GetStatistics() []*StreamStatistics {
+func (s *Relay) GetStatistics() []*StreamStatistics {
 	statistics := make([]*StreamStatistics, 0)
 
 	s.mutex.Lock()

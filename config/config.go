@@ -47,9 +47,6 @@ type AppConfig struct {
 
 	// max size of packets in bytes, default is 1316
 	PacketSize uint32 `toml:"packetSize"`
-
-	// max number of pending connections, default is 10
-	ListenBacklog int `toml:"listenBacklog"`
 }
 
 type AuthConfig struct {
@@ -97,13 +94,9 @@ func Parse(paths []string) (*Config, error) {
 	// set defaults
 	config := Config{
 		App: AppConfig{
-			Addresses:     []string{"localhost:1337"},
-			LatencyMs:     200,
-			LossMaxTTL:    0,
-			Buffersize:    384000, // 1s @ 3Mbits/s
-			SyncClients:   false,
-			PacketSize:    1316, // max is 1456
-			ListenBacklog: 10,
+			Addresses:  []string{"localhost:1337"},
+			LatencyMs:  200,
+			PacketSize: 1316, // max is 1456
 		},
 		Auth: AuthConfig{
 			Type: "static",

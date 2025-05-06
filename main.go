@@ -78,7 +78,6 @@ func main() {
 			SyncClients:   conf.App.SyncClients,
 			PacketSize:    conf.App.PacketSize,
 			Auth:          auth,
-			ListenBacklog: conf.App.ListenBacklog,
 		},
 		Relay: relay.RelayConfig{
 			BufferSize: conf.App.Buffersize,

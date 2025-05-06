@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
-	"runtime"
 	"sync"
 	"time"
 
@@ -34,18 +33,16 @@ type ServerConfig struct {
 	PacketSize    uint32
 	Auth          auth.Authenticator
 	SyncClients   bool
-	ListenBacklog int
 }
 
 type Server struct {
-	config *ServerConfig
-	relay  relay.Relay
+	config    *ServerConfig
+	listeners []gosrt.Listener
+	relay     *relay.Relay
 
 	mutex sync.Mutex
 	conns map[*srtConn]bool
 	done  sync.WaitGroup
-
-	pool *sync.Pool
 }
 
 // NewServer creates a server
@@ -55,21 +52,29 @@ func NewServer(config *Config) *Server {
 		relay:  r,
 		config: &config.Server,
 		conns:  make(map[*srtConn]bool),
-		pool:   newBufferPool(config.Relay.PacketSize),
 	}
 }
 
 // Listen sets up a SRT socket in listen mode
 func (s *Server) Listen(ctx context.Context) error {
 	for _, address := range s.config.Addresses {
-		err := s.listenAt(ctx, address)
+		listener, err := s.listenAt(ctx, address)
 		if err != nil {
 			return err
 		}
 		log.Printf("SRT Listening on %s\n", address)
+		s.listeners = append(s.listeners, listener)
 	}
 
 	return nil
+}
+
+func (s *Server) Addresses() []net.Addr {
+	addrs := make([]net.Addr, 0, len(s.listeners))
+	for _, listener := range s.listeners {
+		addrs = append(addrs, listener.Addr())
+	}
+	return addrs
 }
 
 // Wait blocks until listening sockets have been closed
@@ -77,14 +82,14 @@ func (s *Server) Wait() {
 	s.done.Wait()
 }
 
-func (s *Server) listenAt(ctx context.Context, addr netip.AddrPort) error {
+func (s *Server) listenAt(ctx context.Context, addr netip.AddrPort) (gosrt.Listener, error) {
 	conf := gosrt.DefaultConfig()
 	conf.Latency = time.Duration(s.config.LatencyMs) * time.Millisecond
 	conf.PayloadSize = s.config.PacketSize
 	conf.LossMaxTTL = s.config.LossMaxTTL
 	ln, err := gosrt.Listen("srt", addr.String(), conf)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	s.done.Add(2)
@@ -121,7 +126,7 @@ func (s *Server) listenAt(ctx context.Context, addr netip.AddrPort) error {
 			go s.Handle(ctx, conn)
 		}
 	}()
-	return nil
+	return ln, nil
 }
 
 func (s *Server) shouldAccept(req gosrt.ConnRequest) (gosrt.RejectionReason, bool) {
@@ -169,7 +174,7 @@ func (s *Server) Handle(ctx context.Context, conn gosrt.Conn) {
 	}
 
 	myconn := &srtConn{
-		log:      slog.With("addr", conn.RemoteAddr(), "stream", streamid.Name()),
+		log:      slog.With("addr", conn.RemoteAddr(), "stream", streamid.Name(), "mode", streamid.Mode()),
 		socket:   conn,
 		streamid: &streamid,
 	}
@@ -202,16 +207,10 @@ func (s *Server) play(conn *srtConn) error {
 	demux := format.NewDemuxer()
 	playing := !s.config.SyncClients
 	for {
-		buf, ok := <-sub
-
-		buffered := len(sub)
-		if buffered > cap(sub)/2 {
-			conn.log.Warn(fmt.Sprintf("%d packets late in buffer", len(sub)))
-		}
-
+		buf, err := sub.Read()
 		// Upstream closed, drop connection
-		if !ok {
-			conn.log.Info("upstream closed, dropping")
+		if err != nil {
+			conn.log.Info("disconnecting", "error", err)
 			return nil
 		}
 
@@ -226,7 +225,7 @@ func (s *Server) play(conn *srtConn) error {
 					buf := init[i]
 					_, err := conn.socket.Write(buf)
 					if err != nil {
-						return err
+						return fmt.Errorf("write init: %w", err)
 					}
 				}
 				playing = true
@@ -235,9 +234,9 @@ func (s *Server) play(conn *srtConn) error {
 		}
 
 		// Write to socket
-		_, err := conn.socket.Write(buf)
+		_, err = conn.socket.Write(buf)
 		if err != nil {
-			return err
+			return fmt.Errorf("write: %w", err)
 		}
 	}
 }
@@ -251,18 +250,16 @@ func (s *Server) publish(conn *srtConn) error {
 	defer close(pub)
 	conn.log.Info("publish")
 
+	buf := make([]byte, s.config.PacketSize)
 	for {
-		// Get buffer from pool and return sometime after use
-		buf := s.pool.Get().(*[]byte)
-		runtime.SetFinalizer(buf, func(buf *[]byte) {
-			s.pool.Put(buf)
-		})
+		n, err := conn.socket.Read(buf)
 
-		n, err := conn.socket.Read(*buf)
+		fwd := make([]byte, n)
+		copy(fwd, buf[:n])
 
 		// Push read buffers to all clients via the publish channel
 		if n > 0 {
-			pub <- (*buf)[:n]
+			pub <- fwd
 		}
 
 		if err != nil {

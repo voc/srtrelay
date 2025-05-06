@@ -1,6 +1,6 @@
 module github.com/voc/srtrelay
 
-go 1.23
+go 1.24
 
 require (
 	github.com/IGLOU-EU/go-wildcard/v2 v2.1.0

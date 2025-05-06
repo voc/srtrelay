@@ -14,7 +14,7 @@ func TestChannel_PubSub(t *testing.T) {
 
 	// pub
 	ch.Pub(data)
-	got := <-out
+	got, _ := out.Read()
 
 	if !reflect.DeepEqual(got, data) {
 		t.Errorf("Sub ret = %x, want %x", got, data)
@@ -25,7 +25,7 @@ func TestChannel_PubSub(t *testing.T) {
 
 	// pub2
 	ch.Pub(data)
-	got = <-out
+	got, _ = out.Read()
 
 	if got != nil {
 		t.Errorf("Read after unsub ret %x, want nil", got)
@@ -36,7 +36,7 @@ func TestChannel_DropOnOverflow(t *testing.T) {
 	ch := NewChannel("test", uint(1316*50))
 
 	sub, _ := ch.Sub()
-	capacity := cap(sub) + 1
+	capacity := cap(sub.ch) + 1
 
 	// Overflow subscriber on purpose
 	for i := 0; i < capacity; i++ {
@@ -52,9 +52,9 @@ func TestChannel_DropOnOverflow(t *testing.T) {
 	// Read elements from buffer
 	for i := 0; i < capacity; i++ {
 		expected := (i < capacity-1)
-		_, got := <-sub
-		if got != expected {
-			t.Errorf("Channel read expects %t on pos %d, got %t", expected, i, got)
+		_, err := sub.Read()
+		if (err == nil) != expected {
+			t.Errorf("Channel read expects %t on pos %d, got %t", expected, i, err != nil)
 		}
 	}
 }
@@ -74,7 +74,7 @@ func TestChannel_Close(t *testing.T) {
 		t.Errorf("Expected 0 subscribers after close, got %d", got)
 	}
 
-	if _, ok := <-sub1; ok {
+	if _, err := sub1.Read(); err == nil {
 		t.Error("Subscriber channel should be closed after Close")
 	}
 }
