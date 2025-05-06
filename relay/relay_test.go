@@ -25,8 +25,8 @@ func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
 	pub <- data
 
 	// receive
-	got, ok := <-sub
-	if !ok {
+	got, err := sub.Read()
+	if err != nil {
 		t.Fatal("Subscriber channel should not be closed")
 	}
 	if !reflect.DeepEqual(got, data) {
@@ -38,9 +38,8 @@ func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
 
 	// 2nd send
 	pub <- data
-	got, ok = <-sub
-
-	if got != nil || ok {
+	got, err = sub.Read()
+	if got != nil || err == nil {
 		t.Errorf("Read after unsub ret %x, want nil", got)
 	}
 }
@@ -56,7 +55,7 @@ func TestRelayImpl_PublisherClose(t *testing.T) {
 	// Wait for async teardown in goroutine
 	time.Sleep(100 * time.Millisecond)
 
-	if _, ok := <-sub; ok {
+	if _, err := sub.Read(); err == nil {
 		t.Error("Subscriber channel should be closed")
 	}
 

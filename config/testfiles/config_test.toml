@@ -6,7 +6,6 @@ syncClients = true
 packetSize = 1456
 lossMaxTTL= 50
 publicAddress = "dontlookmeup:5432"
-listenBacklog = 30
 
 [api]
 enabled = false

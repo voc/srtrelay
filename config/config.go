@@ -48,9 +48,6 @@ type AppConfig struct {
 
 	// max size of packets in bytes, default is 1316
 	PacketSize uint32 `toml:"packetSize"`
-
-	// max number of pending connections, default is 10
-	ListenBacklog int `toml:"listenBacklog"`
 }
 
 type AuthConfig struct {

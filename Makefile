@@ -1,6 +1,6 @@
 .PHONY: srtrelay
 srtrelay:
-	go build -o srtrelay
+	CGO_ENABLED=0 go build -o srtrelay
 
 install: srtrelay
 	mkdir -p $$(pwd)/debian/srtrelay/usr/bin

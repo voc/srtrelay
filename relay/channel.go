@@ -2,6 +2,7 @@ package relay
 
 import (
 	"log"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +39,7 @@ type Channel struct {
 	mutex      sync.Mutex
 	subs       Subs
 	maxPackets uint
+	closed     chan struct{}
 
 	// statistics
 	clients atomic.Value
@@ -47,7 +49,7 @@ type Channel struct {
 	activeClients    prometheus.Gauge
 	createdTimestamp prometheus.Gauge
 }
-type Subs []chan []byte
+type Subs []*Subscriber
 
 type Stats struct {
 	clients int
@@ -58,7 +60,7 @@ type Stats struct {
 func (subs Subs) Remove(sub chan []byte) Subs {
 	idx := -1
 	for i := range subs {
-		if subs[i] == sub {
+		if subs[i].ch == sub {
 			idx = i
 			break
 		}
@@ -69,21 +71,19 @@ func (subs Subs) Remove(sub chan []byte) Subs {
 		return subs
 	}
 
-	defer close(sub)
-
-	subs[idx] = subs[len(subs)-1] // Copy last element to index i.
-	subs[len(subs)-1] = nil       // Erase last element (write zero value).
-	return subs[:len(subs)-1]     // Truncate slice.
+	close(sub)
+	return slices.Delete(subs, idx, idx+1)
 }
 
 func NewChannel(name string, maxPackets uint) *Channel {
 	channelActiveClients := activeClients.WithLabelValues(name)
 	ch := &Channel{
 		name:          name,
-		subs:          make([]chan []byte, 0, 10),
+		subs:          make(Subs, 0, 10),
 		maxPackets:    maxPackets,
 		created:       time.Now(),
 		activeClients: channelActiveClients,
+		closed:        make(chan struct{}),
 	}
 	ch.clients.Store(0)
 	ch.createdTimestamp = channelCreatedTimestamp.WithLabelValues(name)
@@ -92,10 +92,13 @@ func NewChannel(name string, maxPackets uint) *Channel {
 }
 
 // Sub subscribes to a channel
-func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
+func (ch *Channel) Sub() (*Subscriber, UnsubscribeFunc) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	sub := make(chan []byte, ch.maxPackets)
+	sub := &Subscriber{
+		ch:         make(chan []byte, ch.maxPackets),
+		chanClosed: ch.closed,
+	}
 	ch.subs = append(ch.subs, sub)
 	ch.clients.Store(len(ch.subs))
 	ch.activeClients.Inc()
@@ -109,7 +112,7 @@ func (ch *Channel) Sub() (<-chan []byte, UnsubscribeFunc) {
 			return
 		}
 
-		ch.subs = ch.subs.Remove(sub)
+		ch.subs = ch.subs.Remove(sub.ch)
 		ch.clients.Store(len(ch.subs))
 		ch.activeClients.Dec()
 	}
@@ -124,7 +127,7 @@ func (ch *Channel) Pub(b []byte) {
 	toRemove := make(Subs, 0, 5)
 	for i := range ch.subs {
 		select {
-		case ch.subs[i] <- b:
+		case ch.subs[i].ch <- b:
 			continue
 
 		// Remember overflowed chans for drop
@@ -134,7 +137,7 @@ func (ch *Channel) Pub(b []byte) {
 		}
 	}
 	for _, sub := range toRemove {
-		ch.subs = ch.subs.Remove(sub)
+		ch.subs = ch.subs.Remove(sub.ch)
 		ch.activeClients.Dec()
 	}
 	ch.clients.Store(len(ch.subs))
@@ -144,9 +147,7 @@ func (ch *Channel) Pub(b []byte) {
 func (ch *Channel) Close() {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	for i := range ch.subs {
-		close(ch.subs[i])
-	}
+	close(ch.closed)
 	ch.subs = nil
 	activeClients.DeleteLabelValues(ch.name)
 	channelCreatedTimestamp.DeleteLabelValues(ch.name)
