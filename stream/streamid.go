@@ -11,11 +11,11 @@ import (
 const IDPrefix = "#!::"
 
 var (
-	InvalidSlashes      = errors.New("Invalid number of slashes, must be 1 or 2")
-	InvalidMode         = errors.New("Invalid mode")
-	MissingName         = errors.New("Missing name after slash")
-	InvalidNamePassword = errors.New("Name/Password is not allowed to contain slashes")
-	InvalidValue        = fmt.Errorf("Invalid value")
+	ErrInvalidSlashes      = errors.New("invalid number of slashes, must be 1 or 2")
+	ErrInvalidMode         = errors.New("invalid mode")
+	ErrMissingName         = errors.New("missing name after slash")
+	ErrInvalidNamePassword = errors.New("name/password is not allowed to contain slashes")
+	ErrInvalidValue        = fmt.Errorf("invalid value")
 )
 
 // Mode - client mode
@@ -74,7 +74,7 @@ func (s *StreamID) FromString(src string) error {
 		for _, kv := range strings.Split(src[len(IDPrefix):], ",") {
 			kv2 := strings.SplitN(kv, "=", 2)
 			if len(kv2) != 2 {
-				return InvalidValue
+				return ErrInvalidValue
 			}
 
 			key, value := kv2[0], kv2[1]
@@ -102,7 +102,7 @@ func (s *StreamID) FromString(src string) error {
 					s.mode = ModePublish
 
 				default:
-					return InvalidMode
+					return ErrInvalidMode
 				}
 
 			// Ignore keys sent by Blackmagic Atem Mini Pro
@@ -121,7 +121,7 @@ func (s *StreamID) FromString(src string) error {
 		if len(split) == 3 {
 			s.password = split[2]
 		} else if len(split) != 2 {
-			return InvalidSlashes
+			return ErrInvalidSlashes
 		}
 		modeStr := split[0]
 		s.name = split[1]
@@ -132,12 +132,12 @@ func (s *StreamID) FromString(src string) error {
 		case "publish":
 			s.mode = ModePublish
 		default:
-			return InvalidMode
+			return ErrInvalidMode
 		}
 	}
 
 	if len(s.name) == 0 {
-		return MissingName
+		return ErrMissingName
 	}
 
 	s.str = src
@@ -147,18 +147,19 @@ func (s *StreamID) FromString(src string) error {
 // toString returns a string representation of the streamid
 func (s *StreamID) toString() (string, error) {
 	mode := ""
-	if s.mode == ModePlay {
+	switch s.mode {
+	case ModePlay:
 		mode = "play"
-	} else if s.mode == ModePublish {
+	case ModePublish:
 		mode = "publish"
-	} else {
-		return "", InvalidMode
+	default:
+		return "", ErrInvalidMode
 	}
 	if strings.Contains(s.name, "/") {
-		return "", InvalidNamePassword
+		return "", ErrInvalidNamePassword
 	}
 	if strings.Contains(s.password, "/") {
-		return "", InvalidNamePassword
+		return "", ErrInvalidNamePassword
 	}
 	if len(s.password) == 0 {
 		return fmt.Sprintf("%s/%s", mode, s.name), nil

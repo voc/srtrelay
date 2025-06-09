@@ -9,8 +9,8 @@ import (
 
 // MPEGTS errors
 var (
-	ErrDataTooLong   = errors.New("Data too long")
-	ErrInvalidPacket = errors.New("Invalid MPEGTS packet")
+	ErrDataTooLong   = errors.New("data too long")
+	ErrInvalidPacket = errors.New("invalid MPEGTS packet")
 )
 
 // PID constants

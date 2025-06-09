@@ -62,7 +62,7 @@ func GetAuthenticator(conf AuthConfig) (auth.Authenticator, error) {
 	case "http":
 		return auth.NewHTTPAuth(conf.HTTP), nil
 	default:
-		return nil, fmt.Errorf("Unknown auth type '%v'", conf.Type)
+		return nil, fmt.Errorf("unknown auth type '%v'", conf.Type)
 	}
 }
 

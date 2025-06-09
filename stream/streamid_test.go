@@ -17,24 +17,24 @@ func TestParseStreamID(t *testing.T) {
 		wantErr      error
 	}{
 		// Old school
-		{"MissingSlash", "s1", 0, "", "", "", InvalidSlashes},
-		{"InvalidName", "play//s1", 0, "", "", "", MissingName},
-		{"InvalidMode", "foobar/bla", 0, "", "", "", InvalidMode},
-		{"InvalidSlash", "foobar/bla//", 0, "", "", "", InvalidSlashes},
+		{"MissingSlash", "s1", 0, "", "", "", ErrInvalidSlashes},
+		{"InvalidName", "play//s1", 0, "", "", "", ErrMissingName},
+		{"InvalidMode", "foobar/bla", 0, "", "", "", ErrInvalidMode},
+		{"InvalidSlash", "foobar/bla//", 0, "", "", "", ErrInvalidSlashes},
 		{"EmptyPass", "play/s1/", ModePlay, "s1", "", "", nil},
 		{"ValidPass", "play/s1/#![äöü", ModePlay, "s1", "#![äöü", "", nil},
 		{"ValidPlay", "play/s1", ModePlay, "s1", "", "", nil},
 		{"ValidPublish", "publish/abcdef", ModePublish, "abcdef", "", "", nil},
 		{"ValidPlaySpace", "play/bla fasel", ModePlay, "bla fasel", "", "", nil},
 		// New hotness - Bad
-		{"NewInvalidPubEmptyName", "#!::m=publish", ModePublish, "", "", "", MissingName},
-		{"NewInvalidPlayEmptyName", "#!::m=request", ModePlay, "", "", "", MissingName},
+		{"NewInvalidPubEmptyName", "#!::m=publish", ModePublish, "", "", "", ErrMissingName},
+		{"NewInvalidPlayEmptyName", "#!::m=request", ModePlay, "", "", "", ErrMissingName},
 		{"NewInvalidPubBadKey", "#!::m=publish,y=bar", ModePublish, "", "", "", fmt.Errorf("unsupported key '%s'", "y")},
 		{"NewInvalidPlayBadKey", "#!::m=request,x=foo", ModePlay, "", "", "", fmt.Errorf("unsupported key '%s'", "x")},
-		{"NewInvalidPubNoEquals", "#!::m=publish,r", ModePublish, "abc", "", "", InvalidValue},
-		{"NewInvalidPlayNoEquals", "#!::m=request,r", ModePlay, "abc", "", "", InvalidValue},
-		{"NewInvalidPubNoValue", "#!::m=publish,r=", ModePublish, "abc", "", "", MissingName},
-		{"NewInvalidPlayNoValue", "#!::m=request,s=", ModePlay, "abc", "", "", MissingName},
+		{"NewInvalidPubNoEquals", "#!::m=publish,r", ModePublish, "abc", "", "", ErrInvalidValue},
+		{"NewInvalidPlayNoEquals", "#!::m=request,r", ModePlay, "abc", "", "", ErrInvalidValue},
+		{"NewInvalidPubNoValue", "#!::m=publish,r=", ModePublish, "abc", "", "", ErrMissingName},
+		{"NewInvalidPlayNoValue", "#!::m=request,s=", ModePlay, "abc", "", "", ErrMissingName},
 		{"NewInvalidPubBadKey", "#!::m=publish,x=", ModePublish, "abc", "", "", fmt.Errorf("unsupported key '%s'", "x")},
 		{"NewInvalidPlayBadKey", "#!::m=request,y=", ModePlay, "abc", "", "", fmt.Errorf("unsupported key '%s'", "y")},
 		// New hotness - Standard
@@ -100,9 +100,9 @@ func TestNewStreamID(t *testing.T) {
 		wantStreamID string
 		wantErr      error
 	}{
-		{"InvalidMode", "s1", 0, "", "", InvalidMode},
-		{"InvalidName", "s1/", ModePlay, "", "", InvalidNamePassword},
-		{"InvalidPass", "s1", ModePlay, "foo/bar", "", InvalidNamePassword},
+		{"InvalidMode", "s1", 0, "", "", ErrInvalidMode},
+		{"InvalidName", "s1/", ModePlay, "", "", ErrInvalidNamePassword},
+		{"InvalidPass", "s1", ModePlay, "foo/bar", "", ErrInvalidNamePassword},
 		{"ValidPlay", "s1", ModePlay, "", "play/s1", nil},
 		{"ValidPublish", "s1", ModePublish, "", "publish/s1", nil},
 		{"ValidPlayPass", "s1", ModePlay, "foo", "play/s1/foo", nil},
