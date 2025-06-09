@@ -26,13 +26,15 @@ func (p H264Parser) ContainsInit(pkt *Packet) (bool, error) {
 		}
 
 		cur := 0
-		if buf[i] == 0x00 {
+		switch buf[i] {
+		case 0x00:
 			cur = 1
-		} else if buf[i] == 0x01 {
+		case 0x01:
 			cur = 3
-		} else {
+		default:
 			cur = 2
 		}
+
 		/* state of last four bytes packed into one byte; two bits for unseen/zero/over
 		 * one/one (0..3 respectively).
 		 */
