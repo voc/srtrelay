@@ -1,3 +1,20 @@
+srtrelay (1.3.0) stable; urgency=medium
+
+  * make listenBacklog configurable
+  * support recommended SRT streamid syntax https://github.com/Haivision/srt/blob/master/docs/features/access-control.md, thanks to @gpmidi
+  * add prometheus-compatible /metrics endpoint, thanks to @SuperQ
+
+ -- ischluff <ischluff@mailbox.org>  Mon, 26 Dec 2023 18:30:00 +0100
+
+srtrelay (1.2.0) stable; urgency=medium
+
+  * configurable packet size
+  * improved performance with buffer reuse
+  * added pprof endpoint for debugging in production
+  * updated srtgo to fix some race conditions
+
+ -- ischluff <ischluff@mailbox.org>  Mon, 06 Dec 2023 18:30:00 +0100
+
 srtrelay (1.1.0) stable; urgency=medium
 
   * add publicAddress for configuring url in API responses
