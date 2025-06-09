@@ -8,7 +8,7 @@ require (
 	github.com/haivision/srtgo v0.0.0-20230627061225-a70d53fcd618
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/prometheus/client_golang v1.22.0
-	gotest.tools/v3 v3.5.1
+	gotest.tools/v3 v3.5.2
 )
 
 require (
