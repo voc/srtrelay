@@ -1,0 +1,26 @@
+name: Build Debian Package on Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+
+    - name: Build Debian package
+      uses: jtdor/build-deb-action@v1
+      with:
+        signed: false
+
+    - name: Upload .deb to GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: build/*.deb
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
