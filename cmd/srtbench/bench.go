@@ -107,6 +107,9 @@ func (t *test) runPublisher(ctx context.Context, streamid string) (*pub, error) 
 	conf := gosrt.DefaultConfig()
 	conf.StreamId = streamid
 	conf.Latency = 50 * time.Millisecond
+	conf.InputBW = 384000 // 3Mbit/s
+	conf.MaxBW = 0
+	conf.OverheadBW = 25
 	conn, err := gosrt.Dial("srt", t.addr, conf)
 	if err != nil {
 		return nil, err
@@ -128,9 +131,13 @@ func (t *test) runPublisher(ctx context.Context, streamid string) (*pub, error) 
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(500 * time.Microsecond):
+			case <-time.After(3436 * time.Microsecond):
+				// 1 packet every 3.436 milliseconds -> 3mbit/s
 			}
-			conn.SetWriteDeadline(time.Now().Add(300 * time.Millisecond))
+			if err := conn.SetWriteDeadline(time.Now().Add(300 * time.Millisecond)); err != nil {
+				t.error(fmt.Errorf("set write deadline failed: %w", err))
+				break
+			}
 			n, err := conn.Write(buffer)
 			if err != nil {
 				if ctx.Err() != nil {
@@ -175,7 +182,10 @@ func (t *test) runSubscriber(ctx context.Context, streamid string) (*sub, error)
 			if ctx.Err() != nil {
 				return
 			}
-			conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+			if err := conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond)); err != nil {
+				t.error(fmt.Errorf("set read deadline failed: %w", err))
+				break
+			}
 			n, err := conn.Read(buffer)
 			if err != nil {
 				if ctx.Err() != nil {
