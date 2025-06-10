@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -12,6 +13,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/haivision/srtgo"
 	"github.com/voc/srtrelay/api"
@@ -100,10 +102,22 @@ func main() {
 		log.Printf("API listening on %s\n", conf.API.Address)
 	}
 
+	<-ctx.Done()
+
 	// Wait for graceful shutdown
-	srtServer.Wait()
-	if apiServer != nil {
-		apiServer.Wait()
+	shutdownDone := make(chan struct{})
+	go func() {
+		srtServer.Wait()
+		if apiServer != nil {
+			apiServer.Wait()
+		}
+		close(shutdownDone)
+	}()
+
+	select {
+	case <-shutdownDone:
+	case <-time.After(time.Second * 2):
+		slog.Warn("Graceful shutdown timed out, forcing exit")
 	}
 	srtgo.CleanupSRT()
 }
