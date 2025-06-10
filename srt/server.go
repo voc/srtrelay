@@ -13,7 +13,6 @@ import (
 	"net"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/haivision/srtgo"
 	"github.com/voc/srtrelay/auth"
@@ -129,7 +128,7 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 
 func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) error {
 	options := make(map[string]string)
-	options["blocking"] = "0"
+	options["blocking"] = "1"
 	options["transtype"] = "live"
 	options["latency"] = strconv.Itoa(int(s.config.Latency))
 
@@ -155,7 +154,6 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 	go func() {
 		defer s.done.Done()
 		for {
-			sck.SetReadDeadline(time.Now().Add(time.Millisecond * 300))
 			sock, addr, err := sck.Accept()
 			if err != nil {
 				if errors.Is(err, &srtgo.SrtEpollTimeout{}) {
