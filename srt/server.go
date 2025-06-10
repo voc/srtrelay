@@ -123,6 +123,26 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 		return false
 	}
 
+	// Check channel existence before accept
+	switch streamid.Mode() {
+	case stream.ModePlay:
+		if !s.relay.ChannelExists(streamid.Name()) {
+			log.Printf("%s - Stream '%s' not found", addr, streamid)
+			if err := socket.SetRejectReason(srtgo.RejectionReasonNotFound); err != nil {
+				log.Printf("Error rejecting stream: %s", err)
+			}
+			return false
+		}
+	case stream.ModePublish:
+		if s.relay.ChannelExists(streamid.Name()) {
+			log.Printf("%s - Stream '%s' already exists", addr, streamid)
+			if err := socket.SetRejectReason(srtgo.RejectionReasonForbidden); err != nil {
+				log.Printf("Error rejecting stream: %s", err)
+			}
+			return false
+		}
+	}
+
 	return true
 }
 

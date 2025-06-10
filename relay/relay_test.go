@@ -89,3 +89,22 @@ func TestRelayImpl_SubscribeNonExisting(t *testing.T) {
 		t.Errorf("Subscribe to non-existing stream should return '%s', got '%s'", ErrStreamNotExisting, err)
 	}
 }
+
+func TestRelayImpl_ChannelExists(t *testing.T) {
+	config := RelayConfig{BufferSize: 1, PacketSize: 1}
+	relay := NewRelay(&config)
+
+	ok := relay.ChannelExists("test")
+	if ok {
+		t.Fatal("Channel should not exist before publishing")
+	}
+
+	_, err := relay.Publish("test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok = relay.ChannelExists("test")
+	if !ok {
+		t.Fatal("Channel should exist after publishing")
+	}
+}
