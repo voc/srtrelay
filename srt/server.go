@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -55,8 +54,6 @@ type ServerImpl struct {
 	mutex sync.Mutex
 	conns map[*srtConn]bool
 	done  sync.WaitGroup
-
-	pool *sync.Pool
 }
 
 // NewServer creates a server
@@ -66,7 +63,6 @@ func NewServer(config *Config) *ServerImpl {
 		relay:  r,
 		config: &config.Server,
 		conns:  make(map[*srtConn]bool),
-		pool:   newBufferPool(config.Relay.PacketSize),
 	}
 }
 
@@ -293,18 +289,15 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 	defer close(pub)
 	log.Printf("%s - publish %s\n", conn.address, conn.streamid.Name())
 
+	buf := make([]byte, 2048)
 	for {
-		// Get buffer from pool and return sometime after use
-		buf := s.pool.Get().(*[]byte)
-		runtime.SetFinalizer(buf, func(buf *[]byte) {
-			s.pool.Put(buf)
-		})
-
-		n, err := conn.socket.Read(*buf)
+		n, err := conn.socket.Read(buf)
 
 		// Push read buffers to all clients via the publish channel
 		if n > 0 {
-			pub <- (*buf)[:n]
+			tmp := make([]byte, n)
+			copy(tmp, buf[:n])
+			pub <- tmp
 		}
 
 		if err != nil {
