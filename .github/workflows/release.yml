@@ -1,6 +1,7 @@
 name: Build Debian Package on Release
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
 
