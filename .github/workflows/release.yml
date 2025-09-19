@@ -1,6 +1,7 @@
 name: Build Debian Package on Release
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -10,18 +11,18 @@ jobs:
 
     steps:
     - name: Checkout source
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Build Debian package
       uses: jtdor/build-deb-action@v1
       with:
+        docker-image: debian:bookworm-backports
         signed: false
 
     - name: Upload .deb to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
         files: build/*.deb
-        docker-image: debian:trixie-slim
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

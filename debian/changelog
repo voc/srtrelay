@@ -1,10 +1,18 @@
+srtrelay (1.4.0) stable; urgency=medium
+
+  * fix srt-listener getting stuck with multiple clients re-/disconnecting
+  * ignore SRT streamid keys sent by Blackmagic Atem Mini Pro
+  * disconnect client early if stream is not found/is duplicated, thanks to @hanatyan128
+
+ -- ischluff <ischluff@mailbox.org>  Tue, 17 Jun 2025 12:10:00 +0100
+
 srtrelay (1.3.0) stable; urgency=medium
 
   * make listenBacklog configurable
   * support recommended SRT streamid syntax https://github.com/Haivision/srt/blob/master/docs/features/access-control.md, thanks to @gpmidi
   * add prometheus-compatible /metrics endpoint, thanks to @SuperQ
 
- -- ischluff <ischluff@mailbox.org>  Mon, 26 Dec 2023 18:30:00 +0100
+ -- ischluff <ischluff@mailbox.org>  Mon, 26 Dec 2024 18:30:00 +0100
 
 srtrelay (1.2.0) stable; urgency=medium
 
@@ -13,7 +21,7 @@ srtrelay (1.2.0) stable; urgency=medium
   * added pprof endpoint for debugging in production
   * updated srtgo to fix some race conditions
 
- -- ischluff <ischluff@mailbox.org>  Mon, 06 Dec 2023 18:30:00 +0100
+ -- ischluff <ischluff@mailbox.org>  Mon, 06 Nov 2023 18:30:00 +0100
 
 srtrelay (1.1.0) stable; urgency=medium
 

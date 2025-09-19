@@ -138,3 +138,36 @@ func TestParser_ParseH264_complex(t *testing.T) {
 		checkParser(t, p, data[tt.offset:], tt.name, tt.expectedFrames)
 	}
 }
+
+func TestParser_ParseH265_basic(t *testing.T) {
+	// Parse 1s complete MPEG-TS with NAL at start
+	data, err := os.ReadFile("h265.ts")
+	if err != nil {
+		t.Fatalf("failed to open test file")
+	}
+	p := NewParser()
+	checkParser(t, p, data, "simple", 25)
+}
+
+func TestParser_ParseH265_complex(t *testing.T) {
+	// Parse 1s complete MPEG-TS with NAL at start
+	data, err := os.ReadFile("h265_long.ts")
+	if err != nil {
+		t.Fatalf("failed to open test file")
+	}
+	log.Println("numpackets", len(data)/PacketLen)
+
+	tests := []struct {
+		name           string
+		offset         int
+		expectedFrames int
+	}{
+		{"NoOffset", 0, 15},
+		{"GOPOffset", 50 * PacketLen, 10},
+		{"2GOPOffset", 100 * PacketLen, 5},
+	}
+	for _, tt := range tests {
+		p := NewParser()
+		checkParser(t, p, data[tt.offset:], tt.name, tt.expectedFrames)
+	}
+}

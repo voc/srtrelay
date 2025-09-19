@@ -11,10 +11,8 @@ import (
 	"io"
 	"log"
 	"net"
-	"runtime"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/haivision/srtgo"
 	"github.com/voc/srtrelay/auth"
@@ -55,8 +53,6 @@ type ServerImpl struct {
 	mutex sync.Mutex
 	conns map[*srtConn]bool
 	done  sync.WaitGroup
-
-	pool *sync.Pool
 }
 
 // NewServer creates a server
@@ -66,7 +62,6 @@ func NewServer(config *Config) *ServerImpl {
 		relay:  r,
 		config: &config.Server,
 		conns:  make(map[*srtConn]bool),
-		pool:   newBufferPool(config.Relay.PacketSize),
 	}
 }
 
@@ -128,12 +123,32 @@ func (s *ServerImpl) listenCallback(socket *srtgo.SrtSocket, version int, addr *
 		return false
 	}
 
+	// Check channel existence before accept
+	switch streamid.Mode() {
+	case stream.ModePlay:
+		if !s.relay.ChannelExists(streamid.Name()) {
+			log.Printf("%s - Stream '%s' not found", addr, streamid)
+			if err := socket.SetRejectReason(srtgo.RejectionReasonNotFound); err != nil {
+				log.Printf("Error rejecting stream: %s", err)
+			}
+			return false
+		}
+	case stream.ModePublish:
+		if s.relay.ChannelExists(streamid.Name()) {
+			log.Printf("%s - Stream '%s' already exists", addr, streamid)
+			if err := socket.SetRejectReason(srtgo.RejectionReasonForbidden); err != nil {
+				log.Printf("Error rejecting stream: %s", err)
+			}
+			return false
+		}
+	}
+
 	return true
 }
 
 func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) error {
 	options := make(map[string]string)
-	options["blocking"] = "0"
+	options["blocking"] = "1"
 	options["transtype"] = "live"
 	options["latency"] = strconv.Itoa(int(s.config.Latency))
 
@@ -159,7 +174,6 @@ func (s *ServerImpl) listenAt(ctx context.Context, host string, port uint16) err
 	go func() {
 		defer s.done.Done()
 		for {
-			sck.SetReadDeadline(time.Now().Add(time.Millisecond * 300))
 			sock, addr, err := sck.Accept()
 			if err != nil {
 				if errors.Is(err, &srtgo.SrtEpollTimeout{}) {
@@ -293,18 +307,15 @@ func (s *ServerImpl) publish(conn *srtConn) error {
 	defer close(pub)
 	log.Printf("%s - publish %s\n", conn.address, conn.streamid.Name())
 
+	buf := make([]byte, 2048)
 	for {
-		// Get buffer from pool and return sometime after use
-		buf := s.pool.Get().(*[]byte)
-		runtime.SetFinalizer(buf, func(buf *[]byte) {
-			s.pool.Put(buf)
-		})
-
-		n, err := conn.socket.Read(*buf)
+		n, err := conn.socket.Read(buf)
 
 		// Push read buffers to all clients via the publish channel
 		if n > 0 {
-			pub <- (*buf)[:n]
+			tmp := make([]byte, n)
+			copy(tmp, buf[:n])
+			pub <- tmp
 		}
 
 		if err != nil {
