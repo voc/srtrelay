@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Checkout source
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Build Debian package
       uses: jtdor/build-deb-action@v1
