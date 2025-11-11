@@ -9,6 +9,6 @@ Homepage: https://github.com/voc/srtrelay
 Package: srtrelay
 Priority: extra
 Architecture: any
-Depends: ${shlibs:Depends}, libsrt1-openssl
+Depends: ${shlibs:Depends}, libsrt1.5-openssl
 Description: srtrelay
  Streaming-Relay for the SRT-protocol
