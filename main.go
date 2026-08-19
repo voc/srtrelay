@@ -22,14 +22,31 @@ import (
 	"github.com/voc/srtrelay/srt"
 )
 
+func parseFlags(conf *config.Config) {
+	flags := flag.NewFlagSet("srtrelay", flag.ExitOnError)
+
+	// flag just for usage
+	flags.String("config", "config.toml", "path to config file")
+
+	// actual flag parsing, use config as default values
+	addresses := flags.String("addresses", strings.Join(conf.App.Addresses, ","), "relay bind addresses, separated by commas")
+	flags.UintVar(&conf.App.LatencyMs, "latency", conf.App.LatencyMs, "srt protocol latency in ms")
+	flags.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
+		`relay buffer size in bytes, determines maximum delay of a client`)
+	flags.StringVar(&conf.Profile.Address, "pprof", "", "enable profiling server on given address")
+	flags.Parse(os.Args[1:])
+	conf.App.Addresses = strings.Split(*addresses, ",")
+}
+
 func main() {
-	// allow specifying config path
-	configFlags := flag.NewFlagSet("config", flag.ContinueOnError)
+	// first flags parse to get config path
+	configFlags := flag.NewFlagSet("srtrelay", flag.ContinueOnError)
 	configFlags.SetOutput(io.Discard)
 	configPath := configFlags.String("config", "config.toml", "")
 	err := configFlags.Parse(os.Args[1:])
-	if err != nil {
-		log.Fatal(err)
+	if err == flag.ErrHelp {
+		// will print usage and exit
+		parseFlags(&config.Config{})
 	}
 
 	// parse config
@@ -37,28 +54,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	parseFlags(conf)
 
-	// flag just for usage
-	flag.String("config", "config.toml", "path to config file")
-
-	// actual flags, use config as default and storage
-	var addressStr string
-	flag.StringVar(&addressStr, "addresses", strings.Join(conf.App.Addresses, ","), "relay bind addresses, separated by commata")
-	flag.UintVar(&conf.App.LatencyMs, "latency", conf.App.LatencyMs, "srt protocol latency in ms")
-	flag.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
-		`relay buffer size in bytes, determines maximum delay of a client`)
-	profile := flag.String("pprof", "", "enable profiling server on given address")
-	flag.Parse()
-
-	if *profile != "" {
-		log.Println("Enabling profiling on", *profile)
-		if err := enablePprof(*profile); err != nil {
+	if conf.Profile.Address != "" {
+		log.Println("Enabling profiling on", conf.Profile.Address)
+		if err := enablePprof(conf.Profile.Address); err != nil {
 			log.Println("failed to enable profiling:", err)
 		}
 	}
 
 	var addresses []netip.AddrPort
-	for _, addr := range strings.Split(addressStr, ",") {
+	for _, addr := range conf.App.Addresses {
 		addrs, err := config.ParseAddress(strings.TrimSpace(addr))
 		if err != nil {
 			log.Fatalf("invalid address %s: %v", addr, err)
@@ -68,7 +74,7 @@ func main() {
 
 	auth, err := config.GetAuthenticator(conf.Auth)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 
 	serverConfig := srt.Config{
