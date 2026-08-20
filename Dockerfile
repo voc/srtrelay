@@ -1,20 +1,8 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.24-bookworm AS build
+FROM golang:1.24-trixie AS build
 
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y git tclsh pkg-config cmake libssl-dev build-essential ninja-build && \
-    git clone --depth 1 --branch v1.5.4 https://github.com/Haivision/srt.git libsrt && \
-    cmake -S libsrt -B libsrt-build -G Ninja && \
-    ninja -C libsrt-build && \
-    ninja -C libsrt-build install && \
-    rm -rf libsrt libsrt-build && \
-    apt-get purge -y git tclsh pkg-config cmake libssl-dev build-essential ninja-build && \
-    apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -24,16 +12,19 @@ ARG TARGETARCH
 RUN GOOS=linux GOARCH=$TARGETARCH go build -v -o srtrelay .
 
 # clean start
-FROM debian:bookworm
+FROM debian:trixie
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install --no-install-recommends -y libssl3 && \
-    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 RUN useradd -l -m -r srtrelay
 USER srtrelay
 WORKDIR /home/srtrelay/
-COPY --from=build /build/config.toml.example ./config.toml
+RUN cat <<'EOF' > ./config.toml
+[app]
+addresses = ["[::]:1337"]
+auth = {type = "static", static = {allow = ["*"]}}
+EOF
 COPY --from=build /build/srtrelay ./
-COPY --from=build /usr/local/lib/libsrt* /usr/lib/
+EXPOSE 1337/udp
+EXPOSE 8080/tcp
 CMD ["./srtrelay"]

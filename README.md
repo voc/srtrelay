@@ -6,7 +6,7 @@ Use at your own risk.
 ## Quick start
 Run with docker (**Note:** nightly image not recommended for production)
 ```bash
-docker run --rm ghcr.io/voc/srtrelay/srtrelay:latest
+docker run -p 1337:1337/udp --rm ghcr.io/voc/srtrelay/srtrelay:latest
 
 # start publisher
 ffmpeg -i test.mp4 -c copy -f mpegts srt://localhost:1337?streamid=publish/test
@@ -57,17 +57,7 @@ docker run --rm -it srtrelay
 
 ## Build without docker
 ### Install Dependencies
-Requires >=libsrt-1.4.2, golang and a C compiler
-
-**Ubuntu**
-  - you will need to [build libsrt yourself](https://github.com/Haivision/srt#build-on-linux)
-
-**Debian 10**:
-  - use libsrt-openssl-dev from the [voc repository](https://c3voc.de/wiki/projects:vocbian)
-  - or [build it yourself](https://github.com/Haivision/srt#build-on-linux)
-
-**Gentoo**:
-  - emerge net-libs/srt
+Requires golang 1.24 or higher
 
 ### Build
 ```bash
