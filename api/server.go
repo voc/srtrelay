@@ -34,9 +34,9 @@ func NewServer(conf config.APIConfig, srtServer *srt.Server) *Server {
 
 func (s *Server) Listen(ctx context.Context) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/streams", s.HandleStreams)
-	mux.HandleFunc("/sockets", s.HandleSockets)
-	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("GET /streams", s.HandleStreams)
+	mux.HandleFunc("GET /sockets", s.HandleSockets)
+	mux.Handle("GET /metrics", promhttp.Handler())
 	serv := &http.Server{
 		Addr:           s.conf.Address,
 		Handler:        mux,
