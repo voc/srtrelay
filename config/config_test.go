@@ -34,6 +34,26 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, conf.Auth.HTTP.PasswordParam, "pass")
 }
 
+func TestDefaultConfig(t *testing.T) {
+	conf, err := Parse([]string{"../config.toml.example"})
+	if err != nil {
+		t.Error(err)
+	}
+	assert.DeepEqual(t, conf.App.Addresses, []string{"localhost:1337"})
+	assert.Equal(t, conf.App.LatencyMs, uint(200))
+	assert.Equal(t, conf.App.Buffersize, uint(384000))
+	assert.Equal(t, conf.App.SyncClients, false)
+	assert.Equal(t, conf.App.PacketSize, uint32(1316))
+	assert.Equal(t, conf.App.LossMaxTTL, uint32(0))
+	assert.Equal(t, conf.App.PublicAddress, "")
+
+	assert.Equal(t, conf.API.Enabled, true)
+	assert.Equal(t, conf.API.Address, ":8080")
+
+	assert.Equal(t, conf.Auth.Type, "static")
+	assert.Equal(t, conf.Auth.Static.Allow[0], "*")
+}
+
 func TestParseAddress(t *testing.T) {
 	tests := []struct {
 		name        string
