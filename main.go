@@ -34,7 +34,7 @@ func parseFlags(conf *config.Config) {
 	flags.UintVar(&conf.App.Buffersize, "buffersize", conf.App.Buffersize,
 		`relay buffer size in bytes, determines maximum delay of a client`)
 	flags.StringVar(&conf.Profile.Address, "pprof", "", "enable profiling server on given address")
-	flags.Parse(os.Args[1:])
+	_ = flags.Parse(os.Args[1:])
 	conf.App.Addresses = strings.Split(*addresses, ",")
 }
 

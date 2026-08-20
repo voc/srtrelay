@@ -1,5 +1,6 @@
 srtrelay
 config.toml
+/result
 # VSCode
 /.vscode
 # Jetbrains
