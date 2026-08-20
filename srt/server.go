@@ -209,37 +209,49 @@ func (s *Server) play(conn *srtConn) error {
 
 	demux := format.NewDemuxer()
 	playing := !s.config.SyncClients
-	for {
+	forward := func() (error, bool) {
 		buf, err := sub.Read()
 		// Upstream closed, drop connection
 		if err != nil {
 			conn.log.Info("disconnecting", "error", err)
-			return nil
+			return nil, false
 		}
+		defer buf.Release()
 
 		// Find initial synchronization point
 		// TODO: implement timeout for sync
 		if !playing {
-			init, err := demux.FindInit(buf)
+			init, err := demux.FindInit(buf.Bytes())
 			if err != nil {
-				return err
+				return err, false
 			} else if init != nil {
 				for i := range init {
-					buf := init[i]
-					_, err := conn.socket.Write(buf)
+					packet := init[i]
+					_, err := conn.socket.Write(packet)
 					if err != nil {
-						return fmt.Errorf("write init: %w", err)
+						return fmt.Errorf("write init: %w", err), false
 					}
 				}
 				playing = true
 			}
-			continue
+			return nil, true
 		}
 
 		// Write to socket
-		_, err = conn.socket.Write(buf)
+		_, err = conn.socket.Write(buf.Bytes())
 		if err != nil {
-			return fmt.Errorf("write: %w", err)
+			return fmt.Errorf("write: %w", err), false
+		}
+		return nil, true
+	}
+
+	for {
+		err, ok := forward()
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
 		}
 	}
 }
@@ -253,16 +265,16 @@ func (s *Server) publish(conn *srtConn) error {
 	defer close(pub)
 	conn.log.Info("publish")
 
-	buf := make([]byte, s.config.PacketSize)
 	for {
-		n, err := conn.socket.Read(buf)
-
-		fwd := make([]byte, n)
-		copy(fwd, buf[:n])
+		buf := s.relay.AcquireBuffer()
+		n, err := conn.socket.Read(buf.Bytes())
 
 		// Push read buffers to all clients via the publish channel
 		if n > 0 {
-			pub <- fwd
+			buf.Resize(n)
+			pub <- buf
+		} else {
+			buf.Release()
 		}
 
 		if err != nil {

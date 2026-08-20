@@ -28,6 +28,7 @@ type Relay struct {
 	mutex    sync.Mutex
 	channels map[string]*Channel
 	config   *RelayConfig
+	pool     *BufferPool
 }
 
 // NewRelay creates a relay
@@ -41,11 +42,16 @@ func NewRelay(config *RelayConfig) *Relay {
 	return &Relay{
 		channels: make(map[string]*Channel),
 		config:   config,
+		pool:     NewBufferPool(config.PacketSize),
 	}
 }
 
+func (s *Relay) AcquireBuffer() *Buffer {
+	return s.pool.Get()
+}
+
 // Publish claims a stream name for publishing
-func (s *Relay) Publish(name string) (chan<- []byte, error) {
+func (s *Relay) Publish(name string) (chan<- *Buffer, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -56,7 +62,7 @@ func (s *Relay) Publish(name string) (chan<- []byte, error) {
 	channel := NewChannel(name, s.config.BufferSize/s.config.PacketSize)
 	s.channels[name] = channel
 
-	ch := make(chan []byte)
+	ch := make(chan *Buffer)
 
 	// Setup publisher goroutine
 	go func() {
@@ -81,7 +87,7 @@ func (s *Relay) Publish(name string) (chan<- []byte, error) {
 }
 
 type Subscriber struct {
-	ch         chan []byte
+	ch         chan *Buffer
 	chanClosed <-chan struct{}
 }
 
@@ -90,7 +96,7 @@ var (
 	errLateSubscriber = errors.New("late subscriber")
 )
 
-func (s *Subscriber) Read() ([]byte, error) {
+func (s *Subscriber) Read() (*Buffer, error) {
 	select {
 	case <-s.chanClosed:
 		return nil, errUpstreamClosed

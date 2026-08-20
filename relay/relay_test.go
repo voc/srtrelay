@@ -7,7 +7,7 @@ import (
 )
 
 func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
-	config := RelayConfig{BufferSize: 50, PacketSize: 1}
+	config := RelayConfig{BufferSize: 50, PacketSize: 4}
 	relay := NewRelay(&config)
 	data := []byte{1, 2, 3, 4}
 
@@ -22,25 +22,32 @@ func TestRelayImpl_SubscribeAndUnsubscribe(t *testing.T) {
 	}
 
 	// send
-	pub <- data
+	buf := relay.AcquireBuffer()
+	copy(buf.Bytes(), data)
+	buf.Resize(4)
+	pub <- buf
 
 	// receive
 	got, err := sub.Read()
 	if err != nil {
 		t.Fatal("Subscriber channel should not be closed")
 	}
-	if !reflect.DeepEqual(got, data) {
-		t.Errorf("Sub ret = %x, want %x", got, data)
+	if !reflect.DeepEqual(got.Bytes(), data) {
+		t.Errorf("Sub ret = %x, want %x", got.Bytes(), data)
 	}
+	got.Release()
 
 	// unsubscribe
 	unsub()
 
 	// 2nd send
-	pub <- data
+	buf = relay.AcquireBuffer()
+	copy(buf.Bytes(), data)
+	buf.Resize(4)
+	pub <- buf
 	got, err = sub.Read()
 	if got != nil || err == nil {
-		t.Errorf("Read after unsub ret %x, want nil", got)
+		t.Errorf("Read after unsub ret %v, want nil", got)
 	}
 }
 

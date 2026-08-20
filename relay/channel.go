@@ -2,6 +2,7 @@ package relay
 
 import (
 	"log"
+
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -57,7 +58,7 @@ type Stats struct {
 }
 
 // Remove single subscriber
-func (subs Subs) Remove(sub chan []byte) Subs {
+func (subs Subs) Remove(sub chan *Buffer) Subs {
 	idx := -1
 	for i := range subs {
 		if subs[i].ch == sub {
@@ -71,8 +72,17 @@ func (subs Subs) Remove(sub chan []byte) Subs {
 		return subs
 	}
 
-	close(sub)
-	return slices.Delete(subs, idx, idx+1)
+	for {
+		select {
+		case buf := <-sub:
+			if buf != nil {
+				buf.Release()
+			}
+		default:
+			close(sub)
+			return slices.Delete(subs, idx, idx+1)
+		}
+	}
 }
 
 func NewChannel(name string, maxPackets uint) *Channel {
@@ -96,7 +106,7 @@ func (ch *Channel) Sub() (*Subscriber, UnsubscribeFunc) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
 	sub := &Subscriber{
-		ch:         make(chan []byte, ch.maxPackets),
+		ch:         make(chan *Buffer, ch.maxPackets),
 		chanClosed: ch.closed,
 	}
 	ch.subs = append(ch.subs, sub)
@@ -120,18 +130,20 @@ func (ch *Channel) Sub() (*Subscriber, UnsubscribeFunc) {
 }
 
 // Pub publishes a packet to a channel
-func (ch *Channel) Pub(b []byte) {
+func (ch *Channel) Pub(b *Buffer) {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
 
 	toRemove := make(Subs, 0, 5)
 	for i := range ch.subs {
+		b.Retain()
 		select {
 		case ch.subs[i].ch <- b:
 			continue
 
 		// Remember overflowed chans for drop
 		default:
+			b.Release()
 			toRemove = append(toRemove, ch.subs[i])
 			log.Println("dropping overflowing client", i)
 		}
@@ -141,6 +153,7 @@ func (ch *Channel) Pub(b []byte) {
 		ch.activeClients.Dec()
 	}
 	ch.clients.Store(len(ch.subs))
+	b.Release()
 }
 
 // Close closes a channel
@@ -148,7 +161,12 @@ func (ch *Channel) Close() {
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
 	close(ch.closed)
+	// Remove subscribers explicitly to return queued buffers to the pool.
+	for len(ch.subs) > 0 {
+		ch.subs = ch.subs.Remove(ch.subs[0].ch)
+	}
 	ch.subs = nil
+	ch.clients.Store(0)
 	activeClients.DeleteLabelValues(ch.name)
 	channelCreatedTimestamp.DeleteLabelValues(ch.name)
 }
