@@ -9,9 +9,11 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/Showmax/go-fqdn"
 	gosrt "github.com/datarhei/gosrt"
 
 	"github.com/voc/srtrelay/auth"
@@ -40,9 +42,10 @@ type Server struct {
 	listeners []gosrt.Listener
 	relay     *relay.Relay
 
-	mutex sync.Mutex
-	conns map[*srtConn]bool
-	done  sync.WaitGroup
+	mutex        sync.Mutex
+	conns        map[*srtConn]bool
+	done         sync.WaitGroup
+	hostnameOnce sync.Once
 }
 
 // NewServer creates a server
@@ -286,10 +289,22 @@ func (s *Server) registerForStats(ctx context.Context, conn *srtConn) {
 
 func (s *Server) GetStatistics() []*relay.StreamStatistics {
 	streams := s.relay.GetStatistics()
+	publicAddress := s.getPublicAddress()
 	for _, st := range streams {
-		st.URL = fmt.Sprintf("srt://%s?streamid=#!::m=request,r=%s", s.config.PublicAddress, st.Name) // New format
+		st.URL = fmt.Sprintf("srt://%s?streamid=#!::m=request,r=%s", publicAddress, st.Name) // New format
 	}
 	return streams
+}
+
+func (s *Server) getPublicAddress() string {
+	s.hostnameOnce.Do(func() {
+		// guess public address if not set
+		if s.config.PublicAddress == "" && len(s.config.Addresses) > 0 {
+			s.config.PublicAddress = fmt.Sprintf("%s:%d", getHostname(), s.config.Addresses[0].Port())
+			log.Println("Note: assuming public address", s.config.PublicAddress)
+		}
+	})
+	return s.config.PublicAddress
 }
 
 type SocketStatistics struct {
@@ -314,4 +329,20 @@ func (s *Server) GetSocketStatistics() []*SocketStatistics {
 	}
 
 	return statistics
+}
+
+func getHostname() string {
+	name, err := fqdn.FqdnHostname()
+	if err != nil {
+		log.Println("fqdn:", err)
+		if err != fqdn.ErrFqdnNotFound {
+			return name
+		}
+
+		name, err = os.Hostname()
+		if err != nil {
+			log.Println("hostname:", err)
+		}
+	}
+	return name
 }

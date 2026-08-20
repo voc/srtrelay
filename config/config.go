@@ -7,10 +7,8 @@ import (
 	"net/netip"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/Showmax/go-fqdn"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/voc/srtrelay/auth"
 )
@@ -78,22 +76,6 @@ func GetAuthenticator(conf AuthConfig) (auth.Authenticator, error) {
 	}
 }
 
-func getHostname() string {
-	name, err := fqdn.FqdnHostname()
-	if err != nil {
-		log.Println("fqdn:", err)
-		if err != fqdn.ErrFqdnNotFound {
-			return name
-		}
-
-		name, err = os.Hostname()
-		if err != nil {
-			log.Println("hostname:", err)
-		}
-	}
-	return name
-}
-
 // Parse tries to find and parse config from paths in order
 func Parse(paths []string) (*Config, error) {
 	// set defaults
@@ -154,16 +136,6 @@ func Parse(paths []string) (*Config, error) {
 	if config.App.DeprecatedAddress != "" {
 		log.Println("Note: config option address is deprecated, please use addresses")
 		config.App.Addresses = []string{config.App.DeprecatedAddress}
-	}
-
-	// guess public address if not set
-	if config.App.PublicAddress == "" {
-		split := strings.Split(config.App.Addresses[0], ":")
-		if len(split) < 2 {
-			log.Fatal("Invalid address: ", config.App.Addresses[0])
-		}
-		config.App.PublicAddress = fmt.Sprintf("%s:%s", getHostname(), split[len(split)-1])
-		log.Println("Note: assuming public address", config.App.PublicAddress)
 	}
 
 	return &config, nil
